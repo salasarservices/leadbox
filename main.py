@@ -632,7 +632,7 @@ def fetch_leads(filters: dict) -> list[dict]:
         def match(d: dict) -> bool:
             fields = [
                 d.get("leadId"),
-                d.get("contactName"),  # include for search too
+                d.get("contactName"),
                 d.get("companyName"),
                 d.get("contactEmail"),
                 d.get("contactPhone"),
@@ -724,6 +724,7 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
+        # Store initial comment as a note
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
@@ -908,7 +909,6 @@ else:
         st.info("No leads found.")
         st.stop()
 
-    # ✅ CHANGED: show contact person after leadId instead of company name
     def lead_label(d: dict) -> str:
         lid = (d.get("leadId") or "(NO LEADID)").upper()
         person = (d.get("contactName") or "(NO CONTACT)").upper()
@@ -938,6 +938,21 @@ else:
                 existing_date_ist = existing_dt.astimezone(IST).date()
             except Exception:
                 existing_date_ist = datetime.now(IST).date()
+
+        # NEW: prefill "Comments" with the most recent note text (if any)
+        existing_notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
+        existing_comment_default = ""
+        if existing_notes:
+            # assume latest note is most recent by createdAt
+            try:
+                existing_notes_sorted = sorted(
+                    existing_notes,
+                    key=lambda n: n.get("createdAt") or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    reverse=True,
+                )
+                existing_comment_default = str(existing_notes_sorted[0].get("text") or "")
+            except Exception:
+                existing_comment_default = ""
 
         with st.form("edit_lead_form"):
             leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
@@ -969,6 +984,15 @@ else:
             brokerage = st.text_input(
                 "Brokerage received",
                 value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+            )
+
+            # ✅ NEW: Comments field on Leads page (editable)
+            comment_edit = st.text_area(
+                "Comments (optional)",
+                value=existing_comment_default,
+                height=90,
+                placeholder="Update comment for this lead...",
+                help="Saving will add this as a new note entry (keeps history).",
             )
 
             st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
@@ -1011,6 +1035,10 @@ else:
             except DuplicateKeyError:
                 st.error("Lead ID collision occurred. Try saving again.")
                 st.stop()
+
+            # ✅ If comment changed / provided, append as a note (history)
+            if (comment_edit or "").strip():
+                add_note(lead_oid, comment_edit.strip(), created_by=None)
 
             st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
