@@ -864,10 +864,8 @@ if page == "Create Lead":
             }
         )
 
-        doc = leads_col().find_one({"_id": new_id})
-        st.success(f"Lead created: {doc.get('leadId')}")
-        doc["_id"] = str(doc["_id"])
-        st.json(doc)
+                doc = leads_col().find_one({"_id": new_id}, {"leadId": 1})
+        st.success(f"Lead created: {doc.get('leadId') if doc else '(UNKNOWN)'}")
 
     card_close()
 
