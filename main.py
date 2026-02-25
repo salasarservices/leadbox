@@ -579,26 +579,21 @@ def next_serial_for_month(lead_date_ist: datetime) -> int:
 
 def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
     """
-    Option B behavior implemented:
-    - if lead date month changes, we generate a NEW leadId based on that month (monthly serial reset).
-    - if month stays same, keep the existing leadId.
-    Returns (leadId, legacyNumber)
+    If lead month/year changes on edit -> generate new leadId for the target month.
+    If same month/year -> keep the existing leadId.
+    Returns (leadId, legacyNumber). legacyNumber=-1 means "do not change legacyNumber".
     """
     if not existing_lead_id:
         serial = next_serial_for_month(target_lead_date_ist)
         return make_lead_id(serial, target_lead_date_ist), serial
 
-    # If leadId follows pattern SalLeadNNMMMYY, derive month/year from target and compare by formatting
-    # Simple: compare the MMMYY portion with the new target's MMMYY; if same, keep leadId.
     mmm = MONTHS[target_lead_date_ist.month - 1]
     yy = str(target_lead_date_ist.year)[-2:]
     suffix = f"{mmm}{yy}".upper()
 
     if existing_lead_id.upper().endswith(suffix):
-        # Same month/year -> keep leadId and keep existing legacyNumber if present later
         return existing_lead_id, -1
 
-    # Month/year changed -> allocate new serial for the new month
     serial = next_serial_for_month(target_lead_date_ist)
     return make_lead_id(serial, target_lead_date_ist), serial
 
@@ -864,7 +859,7 @@ if page == "Create Lead":
             }
         )
 
-                doc = leads_col().find_one({"_id": new_id}, {"leadId": 1})
+        doc = leads_col().find_one({"_id": new_id}, {"leadId": 1})
         st.success(f"Lead created: {doc.get('leadId') if doc else '(UNKNOWN)'}")
 
     card_close()
@@ -923,7 +918,6 @@ else:
         if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_opts}:
             alloc_opts = [current_alloc] + alloc_opts
 
-        # Existing lead date (stored in UTC) -> show in IST as a calendar date
         existing_dt = lead.get("leadDate")
         existing_date_ist = datetime.now(IST).date()
         if isinstance(existing_dt, datetime):
@@ -933,7 +927,6 @@ else:
                 existing_date_ist = datetime.now(IST).date()
 
         with st.form("edit_lead_form"):
-            # NEW: calendar on Leads page
             leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
 
             companyName = st.text_input("Company", value=lead.get("companyName") or "")
@@ -951,7 +944,7 @@ else:
 
             allocPick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick != "(TYPE NEW)" else current_alloc)).strip() or None
+            allocatedToDisplayName = (allocTyped.strip() or (allocPick if alloc_pick != "(TYPE NEW)" else current_alloc)).strip() or None
 
             current_status_label = denormalize_lead_status(lead.get("leadStatus"))
             status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
@@ -962,9 +955,7 @@ else:
                 value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
             )
 
-            # Make behavior explicit in UI
-            st.caption("Note: If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
-
+            st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
             save = st.form_submit_button("Save changes")
 
         if save:
@@ -978,10 +969,8 @@ else:
                     st.error("Brokerage must be a number (or empty).")
                     st.stop()
 
-            # Convert chosen edit date to IST midnight, then store UTC
             new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
 
-            # Regenerate leadId if month/year changed
             current_lead_id = lead.get("leadId")
             new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
 
@@ -997,7 +986,6 @@ else:
                 "brokerageReceived": brokerage_val,
             }
 
-            # Only update leadId + legacyNumber if month/year changed
             if new_lead_id != current_lead_id:
                 updates["leadId"] = new_lead_id
                 updates["legacyNumber"] = new_serial
