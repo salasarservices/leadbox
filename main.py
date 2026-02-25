@@ -462,7 +462,7 @@ def mongo_client() -> MongoClient:
 def clear_db_cache() -> None:
     """
     Clears cached MongoClient resource so next DB access re-initializes connections.
-    Does NOT force logout by rerunning; the app will naturally re-fetch data as widgets trigger reruns.
+    Does NOT explicitly rerun/log out; Streamlit will rerun naturally on next interaction.
     """
     st.cache_resource.clear()
 
@@ -632,8 +632,8 @@ def fetch_leads(filters: dict) -> list[dict]:
         def match(d: dict) -> bool:
             fields = [
                 d.get("leadId"),
+                d.get("contactName"),  # include for search too
                 d.get("companyName"),
-                d.get("contactName"),
                 d.get("contactEmail"),
                 d.get("contactPhone"),
                 d.get("productType"),
@@ -769,10 +769,9 @@ st.write("")
 with st.sidebar:
     db_status_pill(db_ok, db_detail)
 
-    # Refresh DB only: clear cached MongoClient; does not force app rerun.
     if st.button("Refresh DB", use_container_width=True):
         clear_db_cache()
-        st.success("DB cache cleared. Data will refresh as the app reruns on next interaction.")
+        st.success("DB cache cleared. Data will refresh on next interaction.")
 
     card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
     page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
@@ -783,7 +782,7 @@ with st.sidebar:
     card_open("Filters", "lb-cyan", "#00aeef", subtitle="Search and segment leads")
     status = st.selectbox("Status", ["all"] + LEAD_STATUS_OPTIONS, index=0)
     allocatedTo = st.selectbox("Allocated to", ["all"] + allocs, index=0)
-    search = st.text_input("Search", value="", placeholder="Lead ID, company, contact, email, phone...")
+    search = st.text_input("Search", value="", placeholder="Lead ID, contact, company, email, phone...")
     card_close()
 
     card_open("Month Filters", "lb-lime", "#a6ce39", subtitle="View lead activity month-wise (IST)")
@@ -909,11 +908,12 @@ else:
         st.info("No leads found.")
         st.stop()
 
+    # ✅ CHANGED: show contact person after leadId instead of company name
     def lead_label(d: dict) -> str:
         lid = (d.get("leadId") or "(NO LEADID)").upper()
-        co = (d.get("companyName") or "(NO COMPANY)").upper()
+        person = (d.get("contactName") or "(NO CONTACT)").upper()
         stt = denormalize_lead_status(d.get("leadStatus")).upper()
-        return f"{lid} — {co} [{stt}]"
+        return f"{lid} — {person} [{stt}]"
 
     selected = st.selectbox("Select a lead", leads, format_func=lead_label)
 
