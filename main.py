@@ -180,7 +180,7 @@ section[data-testid="stSidebar"] .block-container { padding-top: 0.75rem; }
   box-shadow: var(--shadow);
   border-radius: 14px;
   padding: 14px 14px 10px 14px;
-  margin-bottom: 12px;
+  margin-bottom:  12px;
 }
 .lb-card-header{
   display:flex;
