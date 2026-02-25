@@ -10,6 +10,7 @@ import streamlit as st
 from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import DuplicateKeyError
+import pandas as pd
 
 # -----------------------
 # App config
@@ -320,6 +321,15 @@ footer { visibility: hidden; }
 .db-sub{
   font-size:0.78rem;color:#64748b;margin-top:-2px;
 }
+
+/* Scrollable dataframe container */
+.lb-table-wrap{
+  border: 1px solid rgba(15,23,42,0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  padding: 10px;
+  background: #fff;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -562,6 +572,40 @@ def month_lead_counts(year: int) -> dict[int, int]:
     return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
 
 
+def first_year_in_db() -> int:
+    col = leads_col()
+    doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
+    if not doc:
+        return datetime.now(IST).year
+    dt = doc[0].get("leadDate")
+    if isinstance(dt, datetime):
+        return dt.astimezone(IST).year
+    return datetime.now(IST).year
+
+
+def yearly_month_counts(year: int) -> List[Dict[str, Any]]:
+    """
+    Returns list of {month:int, count:int} for the given year (IST month).
+    Ensures all 12 months exist with 0 if no data.
+    """
+    col = leads_col()
+    start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
+    end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+
+    pipeline = [
+        {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
+        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
+        {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
+        {"$sort": {"_id": 1}},
+    ]
+    res = list(col.aggregate(pipeline))
+    m = {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
+    out: List[Dict[str, Any]] = []
+    for mn in range(1, 13):
+        out.append({"month": mn, "month_name": MONTHS[mn - 1], "count": int(m.get(mn, 0))})
+    return out
+
+
 # -----------------------
 # Serial resets monthly (based on selected Lead Date month)
 # -----------------------
@@ -724,7 +768,7 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
-        # Store initial comment as a note
+        # Store initial comment as a note (history)
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
@@ -885,6 +929,7 @@ else:
         or filters["month_mode"] != "all"
         or (filters["search"] or "").strip() != ""
     )
+
     if not has_filters:
         kpis = base_kpis
     else:
@@ -904,10 +949,67 @@ else:
         unsafe_allow_html=True,
     )
 
+    # -----------------------
+    # NEW: Month-wise lead count chart (yearly), starting from first year in DB
+    # -----------------------
+    chart_year_start = first_year_in_db()
+    chart_year_end = datetime.now(IST).year
+    years = list(range(chart_year_start, chart_year_end + 1))
+
+    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Yearly view from first available DB date")
+    chart_year = st.selectbox("Year", years, index=0)  # start from first year, not latest
+
+    ymc = yearly_month_counts(int(chart_year))
+    df_chart = pd.DataFrame(ymc)[["month_name", "count"]].rename(columns={"month_name": "Month", "count": "Leads"})
+
+    st.line_chart(
+        df_chart.set_index("Month"),
+        height=240,
+        use_container_width=True,
+    )
+    card_close()
+
     leads = fetch_leads(filters)
     if not leads:
         st.info("No leads found.")
         st.stop()
+
+    # -----------------------
+    # NEW: Filter-triggered lead table (only when status/allocated/month filters are used)
+    # (not when only search is used)
+    # -----------------------
+    filter_triggered = (
+        filters["status"] != "all"
+        or filters["allocatedTo"] != "all"
+        or filters["month_mode"] == "month"
+    )
+
+    if filter_triggered:
+        card_open("Filtered Leads (table)", "lb-navy", "#2d448d", subtitle="Scrollable table (no notes/comments)")
+        rows = []
+        for d in leads:
+            rows.append(
+                {
+                    "Lead ID": d.get("leadId") or "",
+                    "Name": d.get("contactName") or "",
+                    "Company": d.get("companyName") or "",
+                    "Phone": d.get("contactPhone") or "",
+                    "Email": d.get("contactEmail") or "",
+                    "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
+                    "Status": denormalize_lead_status(d.get("leadStatus")),
+                }
+            )
+
+        df = pd.DataFrame(rows)
+        st.markdown('<div class="lb-table-wrap">', unsafe_allow_html=True)
+        st.dataframe(
+            df,
+            use_container_width=True,
+            height=320,
+            hide_index=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+        card_close()
 
     def lead_label(d: dict) -> str:
         lid = (d.get("leadId") or "(NO LEADID)").upper()
@@ -939,11 +1041,9 @@ else:
             except Exception:
                 existing_date_ist = datetime.now(IST).date()
 
-        # NEW: prefill "Comments" with the most recent note text (if any)
         existing_notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
         existing_comment_default = ""
         if existing_notes:
-            # assume latest note is most recent by createdAt
             try:
                 existing_notes_sorted = sorted(
                     existing_notes,
@@ -986,7 +1086,6 @@ else:
                 value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
             )
 
-            # ✅ NEW: Comments field on Leads page (editable)
             comment_edit = st.text_area(
                 "Comments (optional)",
                 value=existing_comment_default,
@@ -1036,7 +1135,6 @@ else:
                 st.error("Lead ID collision occurred. Try saving again.")
                 st.stop()
 
-            # ✅ If comment changed / provided, append as a note (history)
             if (comment_edit or "").strip():
                 add_note(lead_oid, comment_edit.strip(), created_by=None)
 
