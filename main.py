@@ -16,7 +16,7 @@ from pymongo.errors import DuplicateKeyError
 st.set_page_config(
     page_title="LeadBox",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded",  # ensures sidebar is open by default
 )
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -142,7 +142,7 @@ def denormalize_lead_status(value: Optional[str]) -> str:
 
 # -----------------------
 # THEME / UI
-# (Safe: does not hide sidebar)
+# Keep the default Streamlit sidebar look (no sidebar CSS overrides)
 # -----------------------
 st.markdown(
     """
@@ -168,19 +168,14 @@ st.markdown(
 .stApp { background: var(--bg); color: var(--text); }
 .block-container { padding-top: 1.0rem; padding-bottom: 1.5rem; max-width: 1200px; }
 
-section[data-testid="stSidebar"]{
-  background: linear-gradient(180deg, var(--pastel-navy) 0%, #ffffff 60%);
-  border-right: 1px solid var(--border);
-}
-section[data-testid="stSidebar"] .block-container { padding-top: 0.75rem; }
-
+/* Cards (main area + sidebar content still ok) */
 .lb-card{
   background: var(--card);
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
   border-radius: 14px;
   padding: 14px 14px 10px 14px;
-  margin-bottom:  12px;
+  margin-bottom: 12px;
 }
 .lb-card-header{
   display:flex;
@@ -220,17 +215,13 @@ div[data-baseweb="select"] > div,
   border-radius: 10px !important;
 }
 
-input[type="number"]{
-  font-variant-numeric: normal !important;
-  font-feature-settings: "tnum" 0, "lnum" 1;
-}
-
 label, .stMarkdown p { font-size: 0.92rem; }
 div[data-baseweb="select"] * { text-transform: uppercase; }
 
+/* Optional: hide only hamburger menu + footer; KEEP header so sidebar toggle stays default */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-header { visibility: hidden; }
+/* header { visibility: hidden; }  <-- removed so default sidebar toggle remains visible */
 
 /* KPI circles */
 .kpi-row{
@@ -448,10 +439,7 @@ def mongo_client() -> MongoClient:
     uri = st.secrets.get(SECRET_KEY_LEADS)
     if not uri:
         st.error(f"Missing Streamlit secret: {SECRET_KEY_LEADS}")
-        st.info(
-            "Streamlit Cloud → App → Settings → Secrets. Add:\n\n"
-            'mongo_uri_leads = "mongodb+srv://USER:PASSWORD@cluster.mongodb.net/?retryWrites=true&w=majority"'
-        )
+        st.info("Streamlit Cloud → App → Settings → Secrets. Add the key mongo_uri_leads with your MongoDB URI.")
         st.stop()
     return MongoClient(uri)
 
