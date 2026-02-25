@@ -459,6 +459,14 @@ def mongo_client() -> MongoClient:
     return MongoClient(uri)
 
 
+def clear_db_cache() -> None:
+    """
+    Clears cached MongoClient resource so next DB access re-initializes connections.
+    Does NOT force logout by rerunning; the app will naturally re-fetch data as widgets trigger reruns.
+    """
+    st.cache_resource.clear()
+
+
 def leads_col():
     return mongo_client()[DB_NAME][COLL_LEADS]
 
@@ -761,6 +769,11 @@ st.write("")
 with st.sidebar:
     db_status_pill(db_ok, db_detail)
 
+    # Refresh DB only: clear cached MongoClient; does not force app rerun.
+    if st.button("Refresh DB", use_container_width=True):
+        clear_db_cache()
+        st.success("DB cache cleared. Data will refresh as the app reruns on next interaction.")
+
     card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
     page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
     card_close()
@@ -942,7 +955,6 @@ else:
             productTyped = st.text_input("Or type product type (adds new)", value="", placeholder="Type a new product here...")
             productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else current_product)).strip() or None
 
-            # ✅ FIXED: alloc_pick -> allocPick, consistent variable names
             allocPick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             allocatedToDisplayName = (
@@ -1000,7 +1012,7 @@ else:
                 st.error("Lead ID collision occurred. Try saving again.")
                 st.stop()
 
-            st.success("Saved. Refresh page to update list & filters.")
+            st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
         card_close()
 
@@ -1037,6 +1049,6 @@ else:
                 st.error("Note cannot be empty.")
             else:
                 add_note(lead_oid, note_text, created_by.strip() or None)
-                st.success("Note added. Reload to see it.")
+                st.success("Note added. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
         card_close()
