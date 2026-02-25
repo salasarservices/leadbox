@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone, date as date_type
+from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 import hmac
 import os
@@ -33,12 +33,6 @@ LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedA
 # Store credentials in Streamlit Cloud secrets (NOT in code).
 # -----------------------
 def _get_login_creds() -> tuple[str, str]:
-    """
-    Reads login credentials from Streamlit secrets (preferred) with optional env var fallback.
-    Required Streamlit secrets:
-      app_user = "..."
-      app_password = "..."
-    """
     user = st.secrets.get("app_user") or os.environ.get("APP_USER") or ""
     pwd = st.secrets.get("app_password") or os.environ.get("APP_PASSWORD") or ""
 
@@ -167,7 +161,6 @@ def denormalize_lead_status(value: Optional[str]) -> str:
 
 # -----------------------
 # THEME / UI
-# (Safe: does not hide sidebar)
 # -----------------------
 st.markdown(
     """
@@ -244,89 +237,6 @@ div[data-baseweb="select"] * { text-transform: uppercase; }
 
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-
-/* KPI circles */
-.kpi-row{
-  display:flex;
-  gap:18px;
-  flex-wrap:wrap;
-  padding: 10px 2px 6px 2px;
-  align-items: flex-start;
-}
-.kpi-wrap{
-  width: 150px;
-  display:flex;
-  flex-direction: column;
-  align-items: center;
-}
-.kpi{
-  width: 140px;
-  height: 140px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-}
-.kpi:hover{
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
-}
-.kpi-inner{
-  text-align:center;
-  padding: 12px;
-}
-.kpi-number{
-  font-size: 2.2rem;
-  font-weight: 900;
-  line-height: 1.05;
-  color: var(--text);
-}
-.kpi-number.navy{ color: var(--navy); }
-.kpi-number.cyan{ color: var(--cyan); }
-.kpi-number.lime{ color: #5a7f11; }
-
-.kpi-sub{
-  margin-top: 4px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 800;
-}
-.kpi-title-below{
-  margin-top: 10px;
-  text-align:center;
-  font-size: 0.82rem;
-  color: var(--muted);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.kpi-bg-total{ background: linear-gradient(180deg, var(--pastel-navy), #fff); }
-.kpi-bg-int{ background: linear-gradient(180deg, var(--pastel-lime), #fff); }
-.kpi-bg-not{ background: linear-gradient(180deg, #FFF1F2, #fff); }
-.kpi-bg-closed{ background: linear-gradient(180deg, var(--pastel-cyan), #fff); }
-.kpi-bg-brok{ background: linear-gradient(180deg, #FFF7ED, #fff); }
-
-/* DB status pill */
-.db-pill{
-  display:flex; align-items:center; gap:8px;
-  padding:8px 10px; border-radius:12px;
-  border:1px solid rgba(15,23,42,0.08);
-  background:#fff;
-}
-.db-dot{
-  width:10px;height:10px;border-radius:999px;
-}
-.db-text{
-  font-size:0.88rem;color:#0f172a;font-weight:800;
-}
-.db-sub{
-  font-size:0.78rem;color:#64748b;margin-top:-2px;
-}
 </style>
 """,
     unsafe_allow_html=True,
@@ -483,7 +393,7 @@ def safe_get(d: dict, path: str, default=None):
     return cur
 
 
-def month_bounds_utc(year: int, month: int):
+def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     start_ist = datetime(year, month, 1, 0, 0, 0, tzinfo=IST)
     if month == 12:
         end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
@@ -509,6 +419,7 @@ def ensure_indexes():
         col.create_index([("leadDate", ASCENDING)], name="idx_leadDate")
     if "idx_leadStatus" not in existing:
         col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
+    # legacyNumber now means "serial within month" (recommended)
     if "idx_legacyNumber" not in existing:
         col.create_index([("legacyNumber", ASCENDING)], name="idx_legacyNumber")
     if "idx_productType" not in existing:
@@ -548,19 +459,44 @@ def allocated_to_suggestions() -> list[str]:
 
 def month_lead_counts(year: int) -> dict[int, int]:
     col = leads_col()
-
+    start_utc, end_utc = month_bounds_utc(year, 1)
     start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
     end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
-    start_utc = start_ist.astimezone(timezone.utc)
-    end_utc = end_ist.astimezone(timezone.utc)
 
     pipeline = [
-        {"$match": {"leadDate": {"$gte": start_utc, "$lt": end_utc}}},
+        {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
         {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
         {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
     ]
     res = list(col.aggregate(pipeline))
     return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
+
+
+# -----------------------
+# NEW: serial per selected month
+# -----------------------
+def next_serial_for_month(lead_date_ist: datetime) -> int:
+    """
+    Returns next serial number within the month of lead_date_ist.
+    Uses legacyNumber as the per-month serial.
+    """
+    col = leads_col()
+    start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
+
+    doc = (
+        col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1})
+        .sort([("legacyNumber", DESCENDING)])
+        .limit(1)
+    )
+    arr = list(doc)
+    if not arr:
+        return 1
+
+    last = arr[0].get("legacyNumber")
+    try:
+        return int(last) + 1
+    except Exception:
+        return 1
 
 
 # -----------------------
@@ -658,30 +594,22 @@ def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
     col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
 
 
-def next_serial() -> int:
-    col = leads_col()
-    doc = col.find({}, {"legacyNumber": 1}).sort([("legacyNumber", DESCENDING)]).limit(1)
-    arr = list(doc)
-    if not arr:
-        return 1
-    last = arr[0].get("legacyNumber")
-    return (int(last) + 1) if last is not None else 1
-
-
 def create_lead(payload: dict) -> ObjectId:
     col = leads_col()
-    serial = next_serial()
 
-    lead_date_local = datetime(
-        payload["leadDate"].year, payload["leadDate"].month, payload["leadDate"].day, 0, 0, 0, tzinfo=IST
-    )
+    # leadDate is a python date from st.date_input
+    lead_date: date_type = payload["leadDate"]
+    lead_date_local = datetime(lead_date.year, lead_date.month, lead_date.day, 0, 0, 0, tzinfo=IST)
+
+    # NEW: serial depends on chosen lead month
+    serial = next_serial_for_month(lead_date_local)
     lead_id = make_lead_id(serial, lead_date_local)
 
     initial_comment = (payload.get("comment") or "").strip() or None
 
     doc = {
         "leadId": lead_id,
-        "legacyNumber": serial,
+        "legacyNumber": serial,  # per-month serial
         "leadDate": lead_date_local.astimezone(timezone.utc),
         "companyName": payload.get("companyName") or None,
         "contactName": payload.get("contactName") or None,
@@ -694,7 +622,7 @@ def create_lead(payload: dict) -> ObjectId:
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
     }
@@ -703,7 +631,8 @@ def create_lead(payload: dict) -> ObjectId:
         res = col.insert_one(doc)
         return res.inserted_id
     except DuplicateKeyError:
-        serial = next_serial()
+        # Retry: if a collision happens, compute again and retry once
+        serial = next_serial_for_month(lead_date_local)
         doc["legacyNumber"] = serial
         doc["leadId"] = make_lead_id(serial, lead_date_local)
         res = col.insert_one(doc)
@@ -778,7 +707,7 @@ filters = {
 # Pages
 # -----------------------
 if page == "Create Lead":
-    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (auto-generates Lead ID)")
+    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
     product_opts = product_suggestions()
     alloc_opts = allocated_to_suggestions()
 
@@ -805,6 +734,7 @@ if page == "Create Lead":
 
         brokerage_raw = st.text_input("Brokerage received (optional)", value="")
         comment = st.text_area("Comments (optional)", value="", height=90, placeholder="Add any initial comment for this lead...")
+
         submitted = st.form_submit_button("Create Lead")
 
     if submitted:
