@@ -942,9 +942,13 @@ else:
             productTyped = st.text_input("Or type product type (adds new)", value="", placeholder="Type a new product here...")
             productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else current_product)).strip() or None
 
+            # ✅ FIXED: alloc_pick -> allocPick, consistent variable names
             allocPick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            allocatedToDisplayName = (allocTyped.strip() or (allocPick if alloc_pick != "(TYPE NEW)" else current_alloc)).strip() or None
+            allocatedToDisplayName = (
+                allocTyped.strip()
+                or (allocPick if allocPick != "(TYPE NEW)" else current_alloc)
+            ).strip() or None
 
             current_status_label = denormalize_lead_status(lead.get("leadStatus"))
             status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
