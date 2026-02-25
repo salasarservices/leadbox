@@ -464,7 +464,6 @@ def mongo_client() -> MongoClient:
     uri = st.secrets.get(SECRET_KEY_LEADS)
     if not uri:
         st.error(f"Missing Streamlit secret: {SECRET_KEY_LEADS}")
-        st.info("Streamlit Cloud → App → Settings → Secrets. Add the key mongo_uri_leads with your MongoDB URI.")
         st.stop()
     return MongoClient(uri)
 
@@ -503,13 +502,73 @@ def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
 
 
-def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
-    nn = str(int(serial)).zfill(2)
-    mmm = MONTHS[lead_date_ist.month - 1]
-    yy = str(lead_date_ist.year)[-2:]
-    return f"SalLead{nn}{mmm}{yy}"
+# -----------------------
+# Month-wise lead counts across all months (no year dropdown)
+# -----------------------
+def first_month_in_db() -> datetime:
+    col = leads_col()
+    doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
+    if not doc:
+        now = datetime.now(IST)
+        return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
+
+    dt = doc[0].get("leadDate")
+    if isinstance(dt, datetime):
+        dt_ist = dt.astimezone(IST)
+        return datetime(dt_ist.year, dt_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    now = datetime.now(IST)
+    return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
 
 
+def month_series_counts() -> pd.DataFrame:
+    """
+    Builds a chronological month series from the FIRST month in DB to CURRENT month.
+    Index labels: 'JUL 25', 'AUG 25', ...
+    """
+    col = leads_col()
+
+    start_m = first_month_in_db()
+    now_ist = datetime.now(IST)
+    end_m = datetime(now_ist.year, now_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    start_utc = start_m.astimezone(timezone.utc)
+    # end exclusive = first day of next month
+    if end_m.month == 12:
+        end_excl_ist = datetime(end_m.year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+    else:
+        end_excl_ist = datetime(end_m.year, end_m.month + 1, 1, 0, 0, 0, tzinfo=IST)
+    end_utc = end_excl_ist.astimezone(timezone.utc)
+
+    pipeline = [
+        {"$match": {"leadDate": {"$gte": start_utc, "$lt": end_utc}}},
+        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
+        {"$group": {"_id": {"y": "$leadDateIST.year", "m": "$leadDateIST.month"}, "count": {"$sum": 1}}},
+    ]
+    res = list(col.aggregate(pipeline))
+    counts = {(int(r["_id"]["y"]), int(r["_id"]["m"])): int(r["count"]) for r in res if r.get("_id")}
+
+    rows: List[Dict[str, Any]] = []
+    y, m = start_m.year, start_m.month
+    while True:
+        label = f"{MONTHS[m-1]} {str(y)[-2:]}"
+        rows.append({"Month": label, "Leads": int(counts.get((y, m), 0))})
+
+        if y == end_m.year and m == end_m.month:
+            break
+
+        if m == 12:
+            y += 1
+            m = 1
+        else:
+            m += 1
+
+    return pd.DataFrame(rows).set_index("Month")
+
+
+# -----------------------
+# Mongo init (indexes) + status
+# -----------------------
 def ensure_indexes():
     col = leads_col()
     existing = col.index_information()
@@ -572,43 +631,16 @@ def month_lead_counts(year: int) -> dict[int, int]:
     return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
 
 
-def first_year_in_db() -> int:
-    col = leads_col()
-    doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
-    if not doc:
-        return datetime.now(IST).year
-    dt = doc[0].get("leadDate")
-    if isinstance(dt, datetime):
-        return dt.astimezone(IST).year
-    return datetime.now(IST).year
-
-
-def yearly_month_counts(year: int) -> List[Dict[str, Any]]:
-    """
-    Returns list of {month:int, count:int} for the given year (IST month).
-    Ensures all 12 months exist with 0 if no data.
-    """
-    col = leads_col()
-    start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
-    end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
-
-    pipeline = [
-        {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
-        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
-        {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
-        {"$sort": {"_id": 1}},
-    ]
-    res = list(col.aggregate(pipeline))
-    m = {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
-    out: List[Dict[str, Any]] = []
-    for mn in range(1, 13):
-        out.append({"month": mn, "month_name": MONTHS[mn - 1], "count": int(m.get(mn, 0))})
-    return out
-
-
 # -----------------------
 # Serial resets monthly (based on selected Lead Date month)
 # -----------------------
+def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
+    nn = str(int(serial)).zfill(2)
+    mmm = MONTHS[lead_date_ist.month - 1]
+    yy = str(lead_date_ist.year)[-2:]
+    return f"SalLead{nn}{mmm}{yy}"
+
+
 def next_serial_for_month(lead_date_ist: datetime) -> int:
     col = leads_col()
     start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
@@ -630,11 +662,6 @@ def next_serial_for_month(lead_date_ist: datetime) -> int:
 
 
 def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
-    """
-    If lead month/year changes on edit -> generate new leadId for the target month.
-    If same month/year -> keep the existing leadId.
-    Returns (leadId, legacyNumber). legacyNumber=-1 means "do not change legacyNumber".
-    """
     if not existing_lead_id:
         serial = next_serial_for_month(target_lead_date_ist)
         return make_lead_id(serial, target_lead_date_ist), serial
@@ -758,7 +785,7 @@ def create_lead(payload: dict) -> ObjectId:
 
     doc = {
         "leadId": lead_id,
-        "legacyNumber": serial,  # monthly serial
+        "legacyNumber": serial,
         "leadDate": lead_date_local.astimezone(timezone.utc),
         "companyName": payload.get("companyName") or None,
         "contactName": payload.get("contactName") or None,
@@ -768,7 +795,6 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
-        # Store initial comment as a note (history)
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
@@ -922,6 +948,7 @@ if page == "Create Lead":
     card_close()
 
 else:
+    # KPIs
     base_kpis = fetch_kpis_from_db({})
     has_filters = (
         filters["status"] != "all"
@@ -929,7 +956,6 @@ else:
         or filters["month_mode"] != "all"
         or (filters["search"] or "").strip() != ""
     )
-
     if not has_filters:
         kpis = base_kpis
     else:
@@ -949,35 +975,21 @@ else:
         unsafe_allow_html=True,
     )
 
-    # -----------------------
-    # NEW: Month-wise lead count chart (yearly), starting from first year in DB
-    # -----------------------
-    chart_year_start = first_year_in_db()
-    chart_year_end = datetime.now(IST).year
-    years = list(range(chart_year_start, chart_year_end + 1))
-
-    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Yearly view from first available DB date")
-    chart_year = st.selectbox("Year", years, index=0)  # start from first year, not latest
-
-    ymc = yearly_month_counts(int(chart_year))
-    df_chart = pd.DataFrame(ymc)[["month_name", "count"]].rename(columns={"month_name": "Month", "count": "Leads"})
-
-    st.line_chart(
-        df_chart.set_index("Month"),
-        height=240,
-        use_container_width=True,
-    )
+    # ✅ Month-wise graph (continuous from first DB month; no year dropdown)
+    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Starts from first available DB month")
+    df_series = month_series_counts()
+    st.line_chart(df_series, height=260, use_container_width=True)
+    if not df_series.empty:
+        st.caption(f"Showing from {df_series.index[0]} to {df_series.index[-1]}")
     card_close()
 
+    # Leads list for the rest of the page
     leads = fetch_leads(filters)
     if not leads:
         st.info("No leads found.")
         st.stop()
 
-    # -----------------------
-    # NEW: Filter-triggered lead table (only when status/allocated/month filters are used)
-    # (not when only search is used)
-    # -----------------------
+    # Table should only show when filtered by Status/AllocatedTo/Month (not just search)
     filter_triggered = (
         filters["status"] != "all"
         or filters["allocatedTo"] != "all"
@@ -999,15 +1011,9 @@ else:
                     "Status": denormalize_lead_status(d.get("leadStatus")),
                 }
             )
-
         df = pd.DataFrame(rows)
         st.markdown('<div class="lb-table-wrap">', unsafe_allow_html=True)
-        st.dataframe(
-            df,
-            use_container_width=True,
-            height=320,
-            hide_index=True,
-        )
+        st.dataframe(df, use_container_width=True, height=320, hide_index=True)
         st.markdown("</div>", unsafe_allow_html=True)
         card_close()
 
