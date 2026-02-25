@@ -11,6 +11,7 @@ from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from pymongo.errors import DuplicateKeyError
 import pandas as pd
+import plotly.graph_objects as go
 
 # -----------------------
 # App config
@@ -503,7 +504,8 @@ def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
 
 
 # -----------------------
-# Month-wise lead counts across all months (no year dropdown)
+# Month-wise lead counts across ALL months (from first month in DB to current month)
+# Labels like "JUL 25"
 # -----------------------
 def first_month_in_db() -> datetime:
     col = leads_col()
@@ -521,11 +523,7 @@ def first_month_in_db() -> datetime:
     return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
 
 
-def month_series_counts() -> pd.DataFrame:
-    """
-    Builds a chronological month series from the FIRST month in DB to CURRENT month.
-    Index labels: 'JUL 25', 'AUG 25', ...
-    """
+def month_series_counts_df() -> pd.DataFrame:
     col = leads_col()
 
     start_m = first_month_in_db()
@@ -533,6 +531,7 @@ def month_series_counts() -> pd.DataFrame:
     end_m = datetime(now_ist.year, now_ist.month, 1, 0, 0, 0, tzinfo=IST)
 
     start_utc = start_m.astimezone(timezone.utc)
+
     # end exclusive = first day of next month
     if end_m.month == 12:
         end_excl_ist = datetime(end_m.year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
@@ -552,7 +551,14 @@ def month_series_counts() -> pd.DataFrame:
     y, m = start_m.year, start_m.month
     while True:
         label = f"{MONTHS[m-1]} {str(y)[-2:]}"
-        rows.append({"Month": label, "Leads": int(counts.get((y, m), 0))})
+        month_start_ist = datetime(y, m, 1, 0, 0, 0, tzinfo=IST)
+        rows.append(
+            {
+                "label": label,
+                "month_start": month_start_ist,  # used for correct ordering
+                "count": int(counts.get((y, m), 0)),
+            }
+        )
 
         if y == end_m.year and m == end_m.month:
             break
@@ -563,7 +569,46 @@ def month_series_counts() -> pd.DataFrame:
         else:
             m += 1
 
-    return pd.DataFrame(rows).set_index("Month")
+    df = pd.DataFrame(rows).sort_values("month_start", ascending=True)
+    return df
+
+
+def plot_month_series(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=df["label"],
+            y=df["count"],
+            mode="lines+markers",
+            line=dict(color="#00aeef", width=3),
+            marker=dict(size=7, color="#2d448d", line=dict(width=1, color="white")),
+            hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        height=300,
+        margin=dict(l=10, r=10, t=20, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial", size=12, color="#0f172a"),
+        xaxis=dict(
+            title="",
+            tickangle=-35,
+            showgrid=False,
+            zeroline=False,
+            tickfont=dict(color="#475569"),
+        ),
+        yaxis=dict(
+            title="",
+            gridcolor="rgba(15, 23, 42, 0.08)",
+            zeroline=False,
+            tickfont=dict(color="#475569"),
+        ),
+        showlegend=False,
+    )
+    return fig
 
 
 # -----------------------
@@ -975,12 +1020,13 @@ else:
         unsafe_allow_html=True,
     )
 
-    # ✅ Month-wise graph (continuous from first DB month; no year dropdown)
-    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Starts from first available DB month")
-    df_series = month_series_counts()
-    st.line_chart(df_series, height=260, use_container_width=True)
-    if not df_series.empty:
-        st.caption(f"Showing from {df_series.index[0]} to {df_series.index[-1]}")
+    # ✅ Plotly month-wise graph for entire range (from first DB month e.g. JUL 25) to current month
+    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Full range from first available DB month to date")
+    df_months = month_series_counts_df()
+    fig = plot_month_series(df_months)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    if not df_months.empty:
+        st.caption(f"Showing from {df_months['label'].iloc[0]} to {df_months['label'].iloc[-1]}")
     card_close()
 
     # Leads list for the rest of the page
