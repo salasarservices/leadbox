@@ -577,6 +577,32 @@ def next_serial_for_month(lead_date_ist: datetime) -> int:
         return 1
 
 
+def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
+    """
+    Option B behavior implemented:
+    - if lead date month changes, we generate a NEW leadId based on that month (monthly serial reset).
+    - if month stays same, keep the existing leadId.
+    Returns (leadId, legacyNumber)
+    """
+    if not existing_lead_id:
+        serial = next_serial_for_month(target_lead_date_ist)
+        return make_lead_id(serial, target_lead_date_ist), serial
+
+    # If leadId follows pattern SalLeadNNMMMYY, derive month/year from target and compare by formatting
+    # Simple: compare the MMMYY portion with the new target's MMMYY; if same, keep leadId.
+    mmm = MONTHS[target_lead_date_ist.month - 1]
+    yy = str(target_lead_date_ist.year)[-2:]
+    suffix = f"{mmm}{yy}".upper()
+
+    if existing_lead_id.upper().endswith(suffix):
+        # Same month/year -> keep leadId and keep existing legacyNumber if present later
+        return existing_lead_id, -1
+
+    # Month/year changed -> allocate new serial for the new month
+    serial = next_serial_for_month(target_lead_date_ist)
+    return make_lead_id(serial, target_lead_date_ist), serial
+
+
 # -----------------------
 # CRUD
 # -----------------------
@@ -707,7 +733,6 @@ def create_lead(payload: dict) -> ObjectId:
         res = col.insert_one(doc)
         return res.inserted_id
     except DuplicateKeyError:
-        # Retry once if two users created at same time for same month
         serial = next_serial_for_month(lead_date_local)
         doc["legacyNumber"] = serial
         doc["leadId"] = make_lead_id(serial, lead_date_local)
@@ -736,7 +761,7 @@ with header_r:
 st.write("")
 
 # -----------------------
-# Sidebar (default Streamlit sidebar)
+# Sidebar
 # -----------------------
 with st.sidebar:
     db_status_pill(db_ok, db_detail)
@@ -892,7 +917,7 @@ else:
     left, right = st.columns([1.25, 1])
 
     with left:
-        card_open("Details", "lb-navy", "#00aeef", subtitle="View & edit lead fields")
+        card_open("Details", "lb-navy", "#00aeef", subtitle="View & edit lead fields (includes Lead Date calendar)")
 
         product_opts = product_suggestions()
         alloc_opts = allocated_to_suggestions()
@@ -900,7 +925,19 @@ else:
         if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_opts}:
             alloc_opts = [current_alloc] + alloc_opts
 
+        # Existing lead date (stored in UTC) -> show in IST as a calendar date
+        existing_dt = lead.get("leadDate")
+        existing_date_ist = datetime.now(IST).date()
+        if isinstance(existing_dt, datetime):
+            try:
+                existing_date_ist = existing_dt.astimezone(IST).date()
+            except Exception:
+                existing_date_ist = datetime.now(IST).date()
+
         with st.form("edit_lead_form"):
+            # NEW: calendar on Leads page
+            leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
+
             companyName = st.text_input("Company", value=lead.get("companyName") or "")
             contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
             contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
@@ -927,6 +964,9 @@ else:
                 value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
             )
 
+            # Make behavior explicit in UI
+            st.caption("Note: If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
+
             save = st.form_submit_button("Save changes")
 
         if save:
@@ -940,19 +980,36 @@ else:
                     st.error("Brokerage must be a number (or empty).")
                     st.stop()
 
-            update_lead(
-                lead_oid,
-                {
-                    "companyName": companyName.strip() or None,
-                    "contactName": contactName.strip() or None,
-                    "contactEmail": contactEmail.strip() or None,
-                    "contactPhone": contactPhone.strip() or None,
-                    "productType": productType,
-                    "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
-                    "leadStatus": normalize_lead_status(leadStatusLabel),
-                    "brokerageReceived": brokerage_val,
-                },
-            )
+            # Convert chosen edit date to IST midnight, then store UTC
+            new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
+
+            # Regenerate leadId if month/year changed
+            current_lead_id = lead.get("leadId")
+            new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
+
+            updates: dict = {
+                "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
+                "companyName": companyName.strip() or None,
+                "contactName": contactName.strip() or None,
+                "contactEmail": contactEmail.strip() or None,
+                "contactPhone": contactPhone.strip() or None,
+                "productType": productType,
+                "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
+                "leadStatus": normalize_lead_status(leadStatusLabel),
+                "brokerageReceived": brokerage_val,
+            }
+
+            # Only update leadId + legacyNumber if month/year changed
+            if new_lead_id != current_lead_id:
+                updates["leadId"] = new_lead_id
+                updates["legacyNumber"] = new_serial
+
+            try:
+                update_lead(lead_oid, updates)
+            except DuplicateKeyError:
+                st.error("Lead ID collision occurred. Try saving again.")
+                st.stop()
+
             st.success("Saved. Refresh page to update list & filters.")
 
         card_close()
