@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from zoneinfo import ZoneInfo
 import hmac
+import os
 
 import streamlit as st
 from bson.objectid import ObjectId
@@ -16,7 +17,7 @@ from pymongo.errors import DuplicateKeyError
 st.set_page_config(
     page_title="LeadBox",
     layout="wide",
-    initial_sidebar_state="expanded",  # ensures sidebar is open by default
+    initial_sidebar_state="expanded",
 )
 
 IST = ZoneInfo("Asia/Kolkata")
@@ -29,10 +30,34 @@ LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedA
 
 # -----------------------
 # LOGIN (simple gate)
-# IMPORTANT: In production, store credentials in st.secrets, not in code.
+# Store credentials in Streamlit Cloud secrets (NOT in code).
 # -----------------------
-APP_USER = "sallead"
-APP_PASSWORD = "s@lle@d#26"
+def _get_login_creds() -> tuple[str, str]:
+    """
+    Reads login credentials from Streamlit secrets (preferred) with optional env var fallback.
+    Required Streamlit secrets:
+      app_user = "..."
+      app_password = "..."
+    """
+    user = st.secrets.get("app_user") or os.environ.get("APP_USER") or ""
+    pwd = st.secrets.get("app_password") or os.environ.get("APP_PASSWORD") or ""
+
+    user = str(user).strip()
+    pwd = str(pwd)
+
+    if not user or not pwd:
+        st.error("Login is not configured.")
+        st.info(
+            "Streamlit Cloud → App → Settings → Secrets. Add:\n\n"
+            'app_user = "your-username"\n'
+            'app_password = "your-password"\n'
+        )
+        st.stop()
+
+    return user, pwd
+
+
+APP_USER, APP_PASSWORD = _get_login_creds()
 
 
 def check_login(username: str, password: str) -> bool:
@@ -142,7 +167,7 @@ def denormalize_lead_status(value: Optional[str]) -> str:
 
 # -----------------------
 # THEME / UI
-# Keep the default Streamlit sidebar look (no sidebar CSS overrides)
+# (Safe: does not hide sidebar)
 # -----------------------
 st.markdown(
     """
@@ -168,7 +193,6 @@ st.markdown(
 .stApp { background: var(--bg); color: var(--text); }
 .block-container { padding-top: 1.0rem; padding-bottom: 1.5rem; max-width: 1200px; }
 
-/* Cards (main area + sidebar content still ok) */
 .lb-card{
   background: var(--card);
   border: 1px solid var(--border);
@@ -218,10 +242,8 @@ div[data-baseweb="select"] > div,
 label, .stMarkdown p { font-size: 0.92rem; }
 div[data-baseweb="select"] * { text-transform: uppercase; }
 
-/* Optional: hide only hamburger menu + footer; KEEP header so sidebar toggle stays default */
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
-/* header { visibility: hidden; }  <-- removed so default sidebar toggle remains visible */
 
 /* KPI circles */
 .kpi-row{
@@ -655,6 +677,8 @@ def create_lead(payload: dict) -> ObjectId:
     )
     lead_id = make_lead_id(serial, lead_date_local)
 
+    initial_comment = (payload.get("comment") or "").strip() or None
+
     doc = {
         "leadId": lead_id,
         "legacyNumber": serial,
@@ -667,7 +691,7 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
-        "notes": [],
+        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
         "schemaVersion": 2,
@@ -780,6 +804,7 @@ if page == "Create Lead":
         productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else "")).strip() or None
 
         brokerage_raw = st.text_input("Brokerage received (optional)", value="")
+        comment = st.text_area("Comments (optional)", value="", height=90, placeholder="Add any initial comment for this lead...")
         submitted = st.form_submit_button("Create Lead")
 
     if submitted:
@@ -804,6 +829,7 @@ if page == "Create Lead":
                 "leadStatus": leadStatusLabel,
                 "leadDate": leadDate,
                 "brokerageReceived": brokerage_val,
+                "comment": comment.strip() or None,
             }
         )
 
