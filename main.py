@@ -331,6 +331,18 @@ footer { visibility: hidden; }
   padding: 10px;
   background: #fff;
 }
+
+/* ✅ Highlight "Select a lead" selectbox a bit */
+.lb-lead-picker div[data-baseweb="select"] > div{
+  border: 1px solid rgba(45, 68, 141, 0.35) !important;
+  box-shadow: 0 10px 22px rgba(45, 68, 141, 0.10) !important;
+  background: linear-gradient(180deg, rgba(238,242,255,0.65), #fff) !important;
+}
+.lb-lead-picker label{
+  font-weight: 900 !important;
+  color: #2d448d !important;
+  letter-spacing: 0.02em !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -532,7 +544,6 @@ def month_series_counts_df() -> pd.DataFrame:
 
     start_utc = start_m.astimezone(timezone.utc)
 
-    # end exclusive = first day of next month
     if end_m.month == 12:
         end_excl_ist = datetime(end_m.year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
     else:
@@ -552,13 +563,7 @@ def month_series_counts_df() -> pd.DataFrame:
     while True:
         label = f"{MONTHS[m-1]} {str(y)[-2:]}"
         month_start_ist = datetime(y, m, 1, 0, 0, 0, tzinfo=IST)
-        rows.append(
-            {
-                "label": label,
-                "month_start": month_start_ist,  # used for correct ordering
-                "count": int(counts.get((y, m), 0)),
-            }
-        )
+        rows.append({"label": label, "month_start": month_start_ist, "count": int(counts.get((y, m), 0))})
 
         if y == end_m.year and m == end_m.month:
             break
@@ -569,13 +574,11 @@ def month_series_counts_df() -> pd.DataFrame:
         else:
             m += 1
 
-    df = pd.DataFrame(rows).sort_values("month_start", ascending=True)
-    return df
+    return pd.DataFrame(rows).sort_values("month_start", ascending=True)
 
 
 def plot_month_series(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
-
     fig.add_trace(
         go.Scatter(
             x=df["label"],
@@ -586,26 +589,14 @@ def plot_month_series(df: pd.DataFrame) -> go.Figure:
             hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
         )
     )
-
     fig.update_layout(
         height=300,
-        margin=dict(l=10, r=10, t=20, b=10),
+        margin=dict(l=10, r=10, t=10, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial", size=12, color="#0f172a"),
-        xaxis=dict(
-            title="",
-            tickangle=-35,
-            showgrid=False,
-            zeroline=False,
-            tickfont=dict(color="#475569"),
-        ),
-        yaxis=dict(
-            title="",
-            gridcolor="rgba(15, 23, 42, 0.08)",
-            zeroline=False,
-            tickfont=dict(color="#475569"),
-        ),
+        xaxis=dict(title="", tickangle=-35, showgrid=False, zeroline=False, tickfont=dict(color="#475569")),
+        yaxis=dict(title="", gridcolor="rgba(15, 23, 42, 0.08)", zeroline=False, tickfont=dict(color="#475569")),
         showlegend=False,
     )
     return fig
@@ -1020,7 +1011,7 @@ else:
         unsafe_allow_html=True,
     )
 
-    # ✅ Plotly month-wise graph for entire range (from first DB month e.g. JUL 25) to current month
+    # Month-wise graph (Plotly)
     card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Full range from first available DB month to date")
     df_months = month_series_counts_df()
     fig = plot_month_series(df_months)
@@ -1063,6 +1054,9 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
         card_close()
 
+    # ✅ Wrap the lead picker in a class so the CSS highlights it
+    st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
+
     def lead_label(d: dict) -> str:
         lid = (d.get("leadId") or "(NO LEADID)").upper()
         person = (d.get("contactName") or "(NO CONTACT)").upper()
@@ -1070,6 +1064,7 @@ else:
         return f"{lid} — {person} [{stt}]"
 
     selected = st.selectbox("Select a lead", leads, format_func=lead_label)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     lead = selected
     lead_oid: ObjectId = lead["_id"]
