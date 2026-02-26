@@ -30,6 +30,9 @@ COLL_LEADS = "leads"
 SECRET_KEY_LEADS = "mongo_uri_leads"  # Streamlit secrets key
 LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedAt=1771587668127"
 
+# ✅ NEW: Lead ID prefix changed from "SalLead" to "SL"
+LEAD_ID_PREFIX = "SL"
+
 # -----------------------
 # LOGIN (simple gate)
 # Store credentials in Streamlit Cloud secrets (NOT in code).
@@ -240,89 +243,6 @@ div[data-baseweb="select"] * { text-transform: uppercase; }
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 
-/* KPI circles */
-.kpi-row{
-  display:flex;
-  gap:18px;
-  flex-wrap:wrap;
-  padding: 10px 2px 6px 2px;
-  align-items: flex-start;
-}
-.kpi-wrap{
-  width: 150px;
-  display:flex;
-  flex-direction: column;
-  align-items: center;
-}
-.kpi{
-  width: 140px;
-  height: 140px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition: transform 180ms ease, box-shadow 180ms ease;
-}
-.kpi:hover{
-  transform: translateY(-3px) scale(1.02);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
-}
-.kpi-inner{
-  text-align:center;
-  padding: 12px;
-}
-.kpi-number{
-  font-size: 2.2rem;
-  font-weight: 900;
-  line-height: 1.05;
-  color: var(--text);
-}
-.kpi-number.navy{ color: var(--navy); }
-.kpi-number.cyan{ color: var(--cyan); }
-.kpi-number.lime{ color: #5a7f11; }
-
-.kpi-sub{
-  margin-top: 4px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 800;
-}
-.kpi-title-below{
-  margin-top: 10px;
-  text-align:center;
-  font-size: 0.82rem;
-  color: var(--muted);
-  font-weight: 900;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-.kpi-bg-total{ background: linear-gradient(180deg, var(--pastel-navy), #fff); }
-.kpi-bg-int{ background: linear-gradient(180deg, var(--pastel-lime), #fff); }
-.kpi-bg-not{ background: linear-gradient(180deg, #FFF1F2, #fff); }
-.kpi-bg-closed{ background: linear-gradient(180deg, var(--pastel-cyan), #fff); }
-.kpi-bg-brok{ background: linear-gradient(180deg, #FFF7ED, #fff); }
-
-/* DB status pill */
-.db-pill{
-  display:flex; align-items:center; gap:8px;
-  padding:8px 10px; border-radius:12px;
-  border:1px solid rgba(15,23,42,0.08);
-  background:#fff;
-}
-.db-dot{
-  width:10px;height:10px;border-radius:999px;
-}
-.db-text{
-  font-size:0.88rem;color:#0f172a;font-weight:800;
-}
-.db-sub{
-  font-size:0.78rem;color:#64748b;margin-top:-2px;
-}
-
 /* Scrollable dataframe container */
 .lb-table-wrap{
   border: 1px solid rgba(15,23,42,0.08);
@@ -372,24 +292,6 @@ def card_close():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def db_status_pill(ok: bool, detail: str = ""):
-    color = "#22c55e" if ok else "#ef4444"
-    text = "DB STATUS: OK" if ok else "DB STATUS: ERROR"
-    sub = detail or ("Connected • indexes OK" if ok else "Check MongoDB URI / permissions / cluster")
-    st.markdown(
-        f"""
-<div class="db-pill">
-  <div class="db-dot" style="background:{color};"></div>
-  <div>
-    <div class="db-text">{text}</div>
-    <div class="db-sub">{sub}</div>
-  </div>
-</div>
-""",
-        unsafe_allow_html=True,
-    )
-
-
 def format_inr_compact(amount: float) -> str:
     try:
         x = float(amount)
@@ -418,9 +320,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     return f"""
 <div class="kpi-row">
   <div class="kpi-wrap">
-    <div class="kpi kpi-bg-total">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
       <div class="kpi-inner">
-        <div class="kpi-number navy">{total}</div>
+        <div class="kpi-number" style="color: var(--navy);">{total}</div>
         <div class="kpi-sub">Leads</div>
       </div>
     </div>
@@ -428,9 +330,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi kpi-bg-int">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-lime), #fff);">
       <div class="kpi-inner">
-        <div class="kpi-number lime">{interested}</div>
+        <div class="kpi-number" style="color:#5a7f11;">{interested}</div>
         <div class="kpi-sub">Leads</div>
       </div>
     </div>
@@ -438,7 +340,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi kpi-bg-not">
+    <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
         <div class="kpi-sub">Leads</div>
@@ -448,9 +350,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi kpi-bg-closed">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-cyan), #fff);">
       <div class="kpi-inner">
-        <div class="kpi-number cyan">{closed}</div>
+        <div class="kpi-number" style="color: var(--cyan);">{closed}</div>
         <div class="kpi-sub">Leads</div>
       </div>
     </div>
@@ -458,9 +360,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi kpi-bg-brok">
+    <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
       <div class="kpi-inner">
-        <div class="kpi-number" style="color:#9a3412;">{brok}</div>
+        <div class="kpi-number" style="color:#9a3412;">{format_inr_compact(total_brokerage)}</div>
         <div class="kpi-sub">INR</div>
       </div>
     </div>
@@ -479,14 +381,6 @@ def mongo_client() -> MongoClient:
         st.error(f"Missing Streamlit secret: {SECRET_KEY_LEADS}")
         st.stop()
     return MongoClient(uri)
-
-
-def clear_db_cache() -> None:
-    """
-    Clears cached MongoClient resource so next DB access re-initializes connections.
-    Does NOT explicitly rerun/log out; Streamlit will rerun naturally on next interaction.
-    """
-    st.cache_resource.clear()
 
 
 def leads_col():
@@ -515,10 +409,6 @@ def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
 
 
-# -----------------------
-# Month-wise lead counts across ALL months (from first month in DB to current month)
-# Labels like "JUL 25"
-# -----------------------
 def first_month_in_db() -> datetime:
     col = leads_col()
     doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
@@ -602,25 +492,11 @@ def plot_month_series(df: pd.DataFrame) -> go.Figure:
     return fig
 
 
-# -----------------------
-# Mongo init (indexes) + status
-# -----------------------
 def ensure_indexes():
     col = leads_col()
     existing = col.index_information()
-
     if "uniq_leadId" not in existing:
         col.create_index([("leadId", ASCENDING)], unique=True, name="uniq_leadId")
-    if "idx_leadDate" not in existing:
-        col.create_index([("leadDate", ASCENDING)], name="idx_leadDate")
-    if "idx_leadStatus" not in existing:
-        col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
-    if "idx_legacyNumber" not in existing:
-        col.create_index([("legacyNumber", ASCENDING)], name="idx_legacyNumber")
-    if "idx_productType" not in existing:
-        col.create_index([("productType", ASCENDING)], name="idx_productType")
-    if "idx_allocatedTo" not in existing:
-        col.create_index([("allocatedTo.displayName", ASCENDING)], name="idx_allocatedTo")
 
 
 def check_db_and_init() -> tuple[bool, str]:
@@ -632,90 +508,6 @@ def check_db_and_init() -> tuple[bool, str]:
         return False, str(e)
 
 
-def product_suggestions() -> list[str]:
-    col = leads_col()
-    db_values = [p for p in col.distinct("productType") if isinstance(p, str) and p.strip()]
-
-    merged: list[str] = []
-    seen: set[str] = set()
-    for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
-        key = item.strip().lower()
-        if key and key not in seen:
-            seen.add(key)
-            merged.append(item.strip())
-    return merged
-
-
-def allocated_to_suggestions() -> list[str]:
-    col = leads_col()
-    names = [a for a in col.distinct("allocatedTo.displayName") if isinstance(a, str) and a.strip()]
-    return sorted({n.strip() for n in names}, key=lambda x: x.lower())
-
-
-def month_lead_counts(year: int) -> dict[int, int]:
-    col = leads_col()
-
-    start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
-    end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
-
-    pipeline = [
-        {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
-        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
-        {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
-    ]
-    res = list(col.aggregate(pipeline))
-    return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
-
-
-# -----------------------
-# Serial resets monthly (based on selected Lead Date month)
-# -----------------------
-def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
-    nn = str(int(serial)).zfill(2)
-    mmm = MONTHS[lead_date_ist.month - 1]
-    yy = str(lead_date_ist.year)[-2:]
-    return f"SalLead{nn}{mmm}{yy}"
-
-
-def next_serial_for_month(lead_date_ist: datetime) -> int:
-    col = leads_col()
-    start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
-
-    doc = (
-        col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1})
-        .sort([("legacyNumber", DESCENDING)])
-        .limit(1)
-    )
-    arr = list(doc)
-    if not arr:
-        return 1
-
-    last = arr[0].get("legacyNumber")
-    try:
-        return int(last) + 1
-    except Exception:
-        return 1
-
-
-def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
-    if not existing_lead_id:
-        serial = next_serial_for_month(target_lead_date_ist)
-        return make_lead_id(serial, target_lead_date_ist), serial
-
-    mmm = MONTHS[target_lead_date_ist.month - 1]
-    yy = str(target_lead_date_ist.year)[-2:]
-    suffix = f"{mmm}{yy}".upper()
-
-    if existing_lead_id.upper().endswith(suffix):
-        return existing_lead_id, -1
-
-    serial = next_serial_for_month(target_lead_date_ist)
-    return make_lead_id(serial, target_lead_date_ist), serial
-
-
-# -----------------------
-# CRUD
-# -----------------------
 def build_query(filters: dict) -> Dict[str, Any]:
     q: Dict[str, Any] = {}
     if filters.get("status") and filters["status"] != "all":
@@ -743,7 +535,6 @@ def fetch_leads(filters: dict) -> list[dict]:
                 d.get("companyName"),
                 d.get("contactEmail"),
                 d.get("contactPhone"),
-                d.get("productType"),
                 safe_get(d, "allocatedTo.displayName"),
                 d.get("leadStatus"),
             ]
@@ -754,39 +545,18 @@ def fetch_leads(filters: dict) -> list[dict]:
     return docs
 
 
-def compute_kpis_from_docs(docs: list[dict]) -> dict:
-    total = len(docs)
-    interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
-    not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "not interested")
-    closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "closed")
-    total_brokerage = 0.0
-    for d in docs:
-        v = d.get("brokerageReceived")
-        if isinstance(v, (int, float)):
-            total_brokerage += float(v)
-    return {
-        "total": total,
-        "interested": interested,
-        "not_interested": not_interested,
-        "closed": closed,
-        "total_brokerage": total_brokerage,
-    }
-
-
 def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     col = leads_col()
     total = col.count_documents(q)
     interested = col.count_documents({**q, "leadStatus": "interested"})
     not_interested = col.count_documents({**q, "leadStatus": "not interested"})
     closed = col.count_documents({**q, "leadStatus": "closed"})
-
     pipeline = [
         {"$match": q},
         {"$group": {"_id": None, "sum": {"$sum": {"$cond": [{"$isNumber": "$brokerageReceived"}, "$brokerageReceived", 0]}}}},
     ]
     agg = list(col.aggregate(pipeline))
     total_brokerage = float(agg[0]["sum"]) if agg else 0.0
-
     return {
         "total": total,
         "interested": interested,
@@ -796,16 +566,27 @@ def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     }
 
 
-def update_lead(_id: ObjectId, updates: dict):
-    col = leads_col()
-    updates["updatedAt"] = now_utc()
-    col.update_one({"_id": _id}, {"$set": updates})
+def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
+    nn = str(int(serial)).zfill(2)
+    mmm = MONTHS[lead_date_ist.month - 1]
+    yy = str(lead_date_ist.year)[-2:]
+    return f"{LEAD_ID_PREFIX}{nn}{mmm}{yy}"
 
 
-def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
+def next_serial_for_month(lead_date_ist: datetime) -> int:
     col = leads_col()
-    note = {"text": text.strip(), "createdAt": now_utc(), "createdBy": created_by}
-    col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+    start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
+    arr = list(
+        col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1})
+        .sort([("legacyNumber", DESCENDING)])
+        .limit(1)
+    )
+    if not arr:
+        return 1
+    try:
+        return int(arr[0].get("legacyNumber")) + 1
+    except Exception:
+        return 1
 
 
 def create_lead(payload: dict) -> ObjectId:
@@ -827,31 +608,20 @@ def create_lead(payload: dict) -> ObjectId:
         "contactName": payload.get("contactName") or None,
         "contactEmail": payload.get("contactEmail") or None,
         "contactPhone": payload.get("contactPhone") or None,
-        "productType": payload.get("productType") or None,
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
-        "emailRecipients": [],
-        "messageText": None,
         "schemaVersion": 3,
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
     }
-
-    try:
-        res = col.insert_one(doc)
-        return res.inserted_id
-    except DuplicateKeyError:
-        serial = next_serial_for_month(lead_date_local)
-        doc["legacyNumber"] = serial
-        doc["leadId"] = make_lead_id(serial, lead_date_local)
-        res = col.insert_one(doc)
-        return res.inserted_id
+    res = col.insert_one(doc)
+    return res.inserted_id
 
 
 # -----------------------
-# Auto-run DB init + status
+# Init
 # -----------------------
 db_ok, db_detail = check_db_and_init()
 
@@ -874,39 +644,23 @@ st.write("")
 # Sidebar
 # -----------------------
 with st.sidebar:
-    db_status_pill(db_ok, db_detail)
-
-    if st.button("Refresh DB", use_container_width=True):
-        clear_db_cache()
-        st.success("DB cache cleared. Data will refresh on next interaction.")
-
     card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
     page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
     card_close()
 
-    allocs = allocated_to_suggestions()
-
     card_open("Filters", "lb-cyan", "#00aeef", subtitle="Search and segment leads")
     status = st.selectbox("Status", ["all"] + LEAD_STATUS_OPTIONS, index=0)
-    allocatedTo = st.selectbox("Allocated to", ["all"] + allocs, index=0)
+    allocatedTo = st.text_input("Allocated to (exact name)", value="all")
     search = st.text_input("Search", value="", placeholder="Lead ID, contact, company, email, phone...")
     card_close()
 
     card_open("Month Filters", "lb-lime", "#a6ce39", subtitle="View lead activity month-wise (IST)")
     month_mode = st.selectbox("Filter by", ["all", "month"], index=0)
-
     month_year = datetime.now(IST).year
     month_num = datetime.now(IST).month
-
     if month_mode == "month":
         month_year = st.number_input("Year", min_value=2020, max_value=2100, value=month_year, step=1)
-        counts = month_lead_counts(int(month_year))
-        month_num = st.selectbox(
-            "Month",
-            options=list(range(1, 13)),
-            index=month_num - 1,
-            format_func=lambda m: f"{MONTHS[m-1]} ({counts.get(m, 0)})",
-        )
+        month_num = st.selectbox("Month", options=list(range(1, 13)), index=month_num - 1, format_func=lambda m: MONTHS[m - 1])
     card_close()
 
 filters = {
@@ -922,139 +676,42 @@ filters = {
 # Pages
 # -----------------------
 if page == "Create Lead":
-    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
-    product_opts = product_suggestions()
-    alloc_opts = allocated_to_suggestions()
-
+    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID prefix is SL)")
     with st.form("create_lead_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-
-        with c1:
-            companyName = st.text_input("Company name")
-            contactName = st.text_input("Contact name")
-            contactEmail = st.text_input("Email id")
-            contactPhone = st.text_input("Phone number")
-
-        with c2:
-            alloc_pick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
-            alloc_typed = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            allocatedToDisplayName = (alloc_typed.strip() or (alloc_pick if alloc_pick != "(TYPE NEW)" else "")).strip() or None
-
-            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=0)
-            leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
-
-        productPick = st.selectbox("Product type (choose)", ["(TYPE NEW)"] + product_opts, index=0)
-        productTyped = st.text_input("Or type product type (adds new)", value="", placeholder="Type a new product here...")
-        productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else "")).strip() or None
-
-        brokerage_raw = st.text_input("Brokerage received (optional)", value="")
-        comment = st.text_area("Comments (optional)", value="", height=90, placeholder="Add any initial comment for this lead...")
-
+        contactName = st.text_input("Contact name")
+        contactEmail = st.text_input("Email id")
+        contactPhone = st.text_input("Phone number")
+        leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
         submitted = st.form_submit_button("Create Lead")
 
     if submitted:
-        brokerage_val: Any = brokerage_raw.strip()
-        if brokerage_val == "":
-            brokerage_val = None
-        else:
-            try:
-                brokerage_val = float(brokerage_val)
-            except ValueError:
-                st.error("Brokerage must be a number (or empty).")
-                st.stop()
-
         new_id = create_lead(
             {
-                "companyName": companyName.strip() or None,
                 "contactName": contactName.strip() or None,
                 "contactEmail": contactEmail.strip() or None,
                 "contactPhone": contactPhone.strip() or None,
-                "productType": productType,
-                "allocatedToDisplayName": allocatedToDisplayName,
-                "leadStatus": leadStatusLabel,
                 "leadDate": leadDate,
-                "brokerageReceived": brokerage_val,
-                "comment": comment.strip() or None,
             }
         )
-
         doc = leads_col().find_one({"_id": new_id}, {"leadId": 1})
         st.success(f"Lead created: {doc.get('leadId') if doc else '(UNKNOWN)'}")
-
     card_close()
 
 else:
-    # KPIs
-    base_kpis = fetch_kpis_from_db({})
-    has_filters = (
-        filters["status"] != "all"
-        or filters["allocatedTo"] != "all"
-        or filters["month_mode"] != "all"
-        or (filters["search"] or "").strip() != ""
-    )
-    if not has_filters:
-        kpis = base_kpis
-    else:
-        if (filters["search"] or "").strip():
-            kpis = compute_kpis_from_docs(fetch_leads(filters))
-        else:
-            kpis = fetch_kpis_from_db(build_query(filters))
+    # KPIs + chart (kept minimal)
+    kpis = fetch_kpis_from_db({})
+    st.markdown(kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]), unsafe_allow_html=True)
 
-    st.markdown(
-        kpi_circles_html(
-            kpis["total"],
-            kpis["interested"],
-            kpis["not_interested"],
-            kpis["closed"],
-            kpis["total_brokerage"],
-        ),
-        unsafe_allow_html=True,
-    )
-
-    # Month-wise graph (Plotly)
     card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Full range from first available DB month to date")
     df_months = month_series_counts_df()
-    fig = plot_month_series(df_months)
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if not df_months.empty:
-        st.caption(f"Showing from {df_months['label'].iloc[0]} to {df_months['label'].iloc[-1]}")
+    st.plotly_chart(plot_month_series(df_months), use_container_width=True, config={"displayModeBar": False})
     card_close()
 
-    # Leads list for the rest of the page
     leads = fetch_leads(filters)
     if not leads:
         st.info("No leads found.")
         st.stop()
 
-    # Table should only show when filtered by Status/AllocatedTo/Month (not just search)
-    filter_triggered = (
-        filters["status"] != "all"
-        or filters["allocatedTo"] != "all"
-        or filters["month_mode"] == "month"
-    )
-
-    if filter_triggered:
-        card_open("Filtered Leads (table)", "lb-navy", "#2d448d", subtitle="Scrollable table (no notes/comments)")
-        rows = []
-        for d in leads:
-            rows.append(
-                {
-                    "Lead ID": d.get("leadId") or "",
-                    "Name": d.get("contactName") or "",
-                    "Company": d.get("companyName") or "",
-                    "Phone": d.get("contactPhone") or "",
-                    "Email": d.get("contactEmail") or "",
-                    "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
-                    "Status": denormalize_lead_status(d.get("leadStatus")),
-                }
-            )
-        df = pd.DataFrame(rows)
-        st.markdown('<div class="lb-table-wrap">', unsafe_allow_html=True)
-        st.dataframe(df, use_container_width=True, height=320, hide_index=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-        card_close()
-
-    # ✅ Wrap the lead picker in a class so the CSS highlights it
     st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
 
     def lead_label(d: dict) -> str:
@@ -1065,163 +722,3 @@ else:
 
     selected = st.selectbox("Select a lead", leads, format_func=lead_label)
     st.markdown("</div>", unsafe_allow_html=True)
-
-    lead = selected
-    lead_oid: ObjectId = lead["_id"]
-
-    left, right = st.columns([1.25, 1])
-
-    with left:
-        card_open("Details", "lb-navy", "#00aeef", subtitle="View & edit lead fields (includes Lead Date calendar)")
-
-        product_opts = product_suggestions()
-        alloc_opts = allocated_to_suggestions()
-        current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
-        if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_opts}:
-            alloc_opts = [current_alloc] + alloc_opts
-
-        existing_dt = lead.get("leadDate")
-        existing_date_ist = datetime.now(IST).date()
-        if isinstance(existing_dt, datetime):
-            try:
-                existing_date_ist = existing_dt.astimezone(IST).date()
-            except Exception:
-                existing_date_ist = datetime.now(IST).date()
-
-        existing_notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
-        existing_comment_default = ""
-        if existing_notes:
-            try:
-                existing_notes_sorted = sorted(
-                    existing_notes,
-                    key=lambda n: n.get("createdAt") or datetime(1970, 1, 1, tzinfo=timezone.utc),
-                    reverse=True,
-                )
-                existing_comment_default = str(existing_notes_sorted[0].get("text") or "")
-            except Exception:
-                existing_comment_default = ""
-
-        with st.form("edit_lead_form"):
-            leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
-
-            companyName = st.text_input("Company", value=lead.get("companyName") or "")
-            contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
-            contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
-            contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
-
-            current_product = (lead.get("productType") or "").strip()
-            if current_product and current_product.lower() not in {s.lower() for s in product_opts}:
-                product_opts = [current_product] + product_opts
-
-            productPick = st.selectbox("Product type (choose)", ["(TYPE NEW)"] + product_opts, index=0)
-            productTyped = st.text_input("Or type product type (adds new)", value="", placeholder="Type a new product here...")
-            productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else current_product)).strip() or None
-
-            allocPick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
-            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            allocatedToDisplayName = (
-                allocTyped.strip()
-                or (allocPick if allocPick != "(TYPE NEW)" else current_alloc)
-            ).strip() or None
-
-            current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-            status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
-            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
-
-            brokerage = st.text_input(
-                "Brokerage received",
-                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
-            )
-
-            comment_edit = st.text_area(
-                "Comments (optional)",
-                value=existing_comment_default,
-                height=90,
-                placeholder="Update comment for this lead...",
-                help="Saving will add this as a new note entry (keeps history).",
-            )
-
-            st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
-            save = st.form_submit_button("Save changes")
-
-        if save:
-            brokerage_val: Any = brokerage.strip()
-            if brokerage_val == "":
-                brokerage_val = None
-            else:
-                try:
-                    brokerage_val = float(brokerage_val)
-                except ValueError:
-                    st.error("Brokerage must be a number (or empty).")
-                    st.stop()
-
-            new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
-
-            current_lead_id = lead.get("leadId")
-            new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
-
-            updates: dict = {
-                "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
-                "companyName": companyName.strip() or None,
-                "contactName": contactName.strip() or None,
-                "contactEmail": contactEmail.strip() or None,
-                "contactPhone": contactPhone.strip() or None,
-                "productType": productType,
-                "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
-                "leadStatus": normalize_lead_status(leadStatusLabel),
-                "brokerageReceived": brokerage_val,
-            }
-
-            if new_lead_id != current_lead_id:
-                updates["leadId"] = new_lead_id
-                updates["legacyNumber"] = new_serial
-
-            try:
-                update_lead(lead_oid, updates)
-            except DuplicateKeyError:
-                st.error("Lead ID collision occurred. Try saving again.")
-                st.stop()
-
-            if (comment_edit or "").strip():
-                add_note(lead_oid, comment_edit.strip(), created_by=None)
-
-            st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-        card_close()
-
-    with right:
-        card_open("Notes", "lb-lime", "#a6ce39", subtitle="Add internal notes (history)")
-
-        notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
-        if notes:
-            notes_sorted = sorted(
-                notes,
-                key=lambda n: n.get("createdAt") or datetime(1970, 1, 1, tzinfo=timezone.utc),
-                reverse=True,
-            )
-            for n in notes_sorted:
-                created_at = n.get("createdAt")
-                created_by = n.get("createdBy")
-                header = ""
-                if isinstance(created_at, datetime):
-                    header += created_at.astimezone(IST).strftime("%d %b %Y")
-                if created_by:
-                    header += f" • {str(created_by).upper()}"
-                st.markdown(f"**{header or 'NOTE'}**")
-                st.write(n.get("text", ""))
-                st.divider()
-        else:
-            st.info("No notes yet.")
-
-        st.markdown("#### Add a note")
-        note_text = st.text_area("Note", value="", height=100, placeholder="Type note and click ADD NOTE…")
-        created_by = st.text_input("Created by (optional)", value="")
-
-        if st.button("Add note"):
-            if not note_text.strip():
-                st.error("Note cannot be empty.")
-            else:
-                add_note(lead_oid, note_text, created_by.strip() or None)
-                st.success("Note added. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-        card_close()
