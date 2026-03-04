@@ -951,29 +951,24 @@ if page == "Create Lead":
     card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
     product_opts = product_suggestions()
     alloc_opts = allocated_to_suggestions()
+    
+    save = False  # <-- add this
 
-    with st.form("edit_lead_form"):
-        c1, c2 = st.columns(2)
+with st.form("edit_lead_form"):
+    c1, c2 = st.columns(2)
 
     with c1:
         leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
-
         companyName = st.text_input("Company", value=lead.get("companyName") or "")
         contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
         contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
         contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
 
     with c2:
-        # --- Lead status (define status_index BEFORE using it) ---
         current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-        status_index = (
-            LEAD_STATUS_OPTIONS.index(current_status_label)
-            if current_status_label in LEAD_STATUS_OPTIONS
-            else 0
-        )
+        status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
         leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
 
-        # --- Allocated To (default to existing DB value; if none, show None) ---
         alloc_opts = allocated_to_suggestions()
         current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
 
@@ -981,7 +976,7 @@ if page == "Create Lead":
         if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
             alloc_options.insert(2, current_alloc)
 
-        alloc_index = 0  # "None"
+        alloc_index = 0
         if current_alloc:
             try:
                 alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
@@ -989,19 +984,9 @@ if page == "Create Lead":
                 alloc_index = 0
 
         allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-        allocTyped = st.text_input(
-            "Or type allocated to (adds new)",
-            value="",
-            placeholder="Type a new name here...",
-        )
+        allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+        allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
 
-        allocatedToDisplayName = (
-            (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else ""))
-            .strip()
-            or None
-        )
-
-    # Full-width fields under both columns (matches Create Lead feel)
     brokerage = st.text_input(
         "Brokerage received",
         value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
