@@ -1071,5 +1071,4 @@ if save:
         add_note(lead_oid, comment_edit.strip(), created_by=None)
 
     st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-                st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+    st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
