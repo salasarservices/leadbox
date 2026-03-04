@@ -1111,6 +1111,7 @@ else:
                 existing_comment_default = ""
 
         with st.form("edit_lead_form"):
+            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
             leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
 
             companyName = st.text_input("Company", value=lead.get("companyName") or "")
@@ -1170,6 +1171,7 @@ else:
                 "contactEmail": contactEmail.strip() or None,
                 "contactPhone": contactPhone.strip() or None,
                 "leadStatus": normalize_lead_status(leadStatusLabel),
+                "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
                 "brokerageReceived": brokerage_val,
             }
 
