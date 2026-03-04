@@ -1181,82 +1181,51 @@ else:
             save = st.form_submit_button("Save changes")
 
         if save:
-            brokerage_val: Any = brokerage.strip()
-            if brokerage_val == "":
-                brokerage_val = None
-            else:
-                try:
-                    brokerage_val = float(brokerage_val)
-                except ValueError:
-                    st.error("Brokerage must be a number (or empty).")
-                    st.stop()
+    # ---- Brokerage parsing ----
+    brokerage_val: Any = brokerage.strip()
+    if brokerage_val == "":
+        brokerage_val = None
+    else:
+        try:
+            brokerage_val = float(brokerage_val)
+        except ValueError:
+            st.error("Brokerage must be a number (or empty).")
+            st.stop()
 
-            new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
+    # ---- Lead date / Lead ID regeneration ----
+    new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
 
-            current_lead_id = lead.get("leadId")
-            new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
+    current_lead_id = lead.get("leadId")
+    new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
 
-            updates: dict = {
-                "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
-                "companyName": companyName.strip() or None,
-                "contactName": contactName.strip() or None,
-                "contactEmail": contactEmail.strip() or None,
-                "contactPhone": contactPhone.strip() or None,
-                "leadStatus": normalize_lead_status(leadStatusLabel),
-                "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
-                "brokerageReceived": brokerage_val,
-            }
+    # ---- Updates ----
+    updates: dict = {
+        "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
+        "companyName": companyName.strip() or None,
+        "contactName": contactName.strip() or None,
+        "contactEmail": contactEmail.strip() or None,
+        "contactPhone": contactPhone.strip() or None,
+        "leadStatus": normalize_lead_status(leadStatusLabel),
 
-            if new_lead_id != current_lead_id:
-                updates["leadId"] = new_lead_id
-                updates["legacyNumber"] = new_serial
+        # ✅ Persist allocated-to (if None, it will clear displayName)
+        "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
 
-            try:
-                update_lead(lead_oid, updates)
-            except DuplicateKeyError:
-                st.error("Lead ID collision occurred. Try saving again.")
-                st.stop()
+        "brokerageReceived": brokerage_val,
+    }
 
-            if (comment_edit or "").strip():
-                add_note(lead_oid, comment_edit.strip(), created_by=None)
+    if new_lead_id != current_lead_id:
+        updates["leadId"] = new_lead_id
+        updates["legacyNumber"] = new_serial
 
-            st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+    # ---- Save to DB ----
+    try:
+        update_lead(lead_oid, updates)
+    except DuplicateKeyError:
+        st.error("Lead ID collision occurred. Try saving again.")
+        st.stop()
 
-        card_close()
+    # ---- Notes ----
+    if (comment_edit or "").strip():
+        add_note(lead_oid, comment_edit.strip(), created_by=None)
 
-    with right:
-        card_open("Notes", "lb-lime", "#a6ce39", subtitle="Add internal notes (history)")
-
-        notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
-        if notes:
-            notes_sorted = sorted(
-                notes,
-                key=lambda n: n.get("createdAt") or datetime(1970, 1, 1, tzinfo=timezone.utc),
-                reverse=True,
-            )
-            for n in notes_sorted:
-                created_at = n.get("createdAt")
-                created_by = n.get("createdBy")
-                header = ""
-                if isinstance(created_at, datetime):
-                    header += created_at.astimezone(IST).strftime("%d %b %Y")
-                if created_by:
-                    header += f" • {str(created_by).upper()}"
-                st.markdown(f"**{header or 'NOTE'}**")
-                st.write(n.get("text", ""))
-                st.divider()
-        else:
-            st.info("No notes yet.")
-
-        st.markdown("#### Add a note")
-        note_text = st.text_area("Note", value="", height=100, placeholder="Type note and click ADD NOTE…")
-        created_by = st.text_input("Created by (optional)", value="")
-
-        if st.button("Add note"):
-            if not note_text.strip():
-                st.error("Note cannot be empty.")
-            else:
-                add_note(lead_oid, note_text, created_by.strip() or None)
-                st.success("Note added. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-        card_close()
+    st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
