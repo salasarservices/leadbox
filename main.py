@@ -947,94 +947,255 @@ filters = {
 # -----------------------
 # Pages
 # -----------------------
-if page == "Leads":
-    leads = fetch_leads(filters)
-    kpis = compute_kpis_from_docs(leads)
+if page == "Create Lead":
+    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
+    product_opts = product_suggestions()
+    alloc_opts = allocated_to_suggestions()
+
+    with st.form("create_lead_form", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+
+        with c1:
+            companyName = st.text_input("Company name")
+            contactName = st.text_input("Contact name")
+            contactEmail = st.text_input("Email id")
+            contactPhone = st.text_input("Phone number")
+
+        with c2:
+            alloc_pick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
+            alloc_typed = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            allocatedToDisplayName = (alloc_typed.strip() or (alloc_pick if alloc_pick != "(TYPE NEW)" else "")).strip() or None
+
+            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=0)
+            leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
+
+        productPick = st.selectbox("Product type (choose)", ["(TYPE NEW)"] + product_opts, index=0)
+        productTyped = st.text_input("Or type product type (adds new)", value="", placeholder="Type a new product here...")
+        productType = (productTyped.strip() or (productPick if productPick != "(TYPE NEW)" else "")).strip() or None
+
+        brokerage_raw = st.text_input("Brokerage received (optional)", value="")
+        comment = st.text_area("Comments (optional)", value="", height=90, placeholder="Add any initial comment for this lead...")
+
+        submitted = st.form_submit_button("Create Lead")
+
+    if submitted:
+        brokerage_val: Any = brokerage_raw.strip()
+        if brokerage_val == "":
+            brokerage_val = None
+        else:
+            try:
+                brokerage_val = float(brokerage_val)
+            except ValueError:
+                st.error("Brokerage must be a number (or empty).")
+                st.stop()
+
+        new_id = create_lead(
+            {
+                "companyName": companyName.strip() or None,
+                "contactName": contactName.strip() or None,
+                "contactEmail": contactEmail.strip() or None,
+                "contactPhone": contactPhone.strip() or None,
+                "productType": productType,
+                "allocatedToDisplayName": allocatedToDisplayName,
+                "leadStatus": leadStatusLabel,
+                "leadDate": leadDate,
+                "brokerageReceived": brokerage_val,
+                "comment": comment.strip() or None,
+            }
+        )
+
+        doc = leads_col().find_one({"_id": new_id}, {"leadId": 1})
+        st.success(f"Lead created: {doc.get('leadId') if doc else '(UNKNOWN)'}")
+
+    card_close()
+
+else:
+    base_kpis = fetch_kpis_from_db({})
+    has_filters = (
+        filters["status"] != "all"
+        or filters["allocatedTo"] != "all"
+        or filters["month_mode"] != "all"
+        or (filters["search"] or "").strip() != ""
+    )
+
+    if not has_filters:
+        kpis = base_kpis
+    else:
+        if (filters["search"] or "").strip():
+            kpis = compute_kpis_from_docs(fetch_leads(filters))
+        else:
+            kpis = fetch_kpis_from_db(build_query(filters))
+
     st.markdown(
-        kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
+        kpi_circles_html(
+            kpis["total"],
+            kpis["interested"],
+            kpis["not_interested"],
+            kpis["closed"],
+            kpis["total_brokerage"],
+        ),
         unsafe_allow_html=True,
     )
 
-    left, right = st.columns([0.45, 0.55])
+    card_open("Leads received (month-wise)", "lb-cyan", "#00aeef", subtitle="Full range from first available DB month to date")
+    df_months = month_series_counts_df()
+    fig = plot_month_series(df_months)
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    if not df_months.empty:
+        st.caption(f"Showing from {df_months['label'].iloc[0]} to {df_months['label'].iloc[-1]}")
+    card_close()
+
+    leads = fetch_leads(filters)
+    if not leads:
+        st.info("No leads found.")
+        st.stop()
+
+    filter_triggered = (
+        filters["status"] != "all"
+        or filters["allocatedTo"] != "all"
+        or filters["month_mode"] == "month"
+    )
+
+    if filter_triggered:
+        card_open("Filtered Leads (table)", "lb-navy", "#2d448d", subtitle="Scrollable table (no notes/comments)")
+        rows = []
+        for d in leads:
+            rows.append(
+                {
+                    "Lead ID": d.get("leadId") or "",
+                    "Name": d.get("contactName") or "",
+                    "Company": d.get("companyName") or "",
+                    "Phone": d.get("contactPhone") or "",
+                    "Email": d.get("contactEmail") or "",
+                    "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
+                    "Status": denormalize_lead_status(d.get("leadStatus")),
+                }
+            )
+        df = pd.DataFrame(rows)
+        st.markdown('<div class="lb-table-wrap">', unsafe_allow_html=True)
+        st.dataframe(df, use_container_width=True, height=320, hide_index=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        card_close()
+
+    st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
+
+    def lead_label(d: dict) -> str:
+        lid = (d.get("leadId") or "(NO LEADID)").upper()
+        person = (d.get("contactName") or "(NO CONTACT)").upper()
+        stt = denormalize_lead_status(d.get("leadStatus")).upper()
+        return f"{lid} — {person} [{stt}]"
+
+    selected = st.selectbox("Select a lead", leads, format_func=lead_label)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    lead = selected
+    lead_oid: ObjectId = lead["_id"]
+
+    left, right = st.columns([1.25, 1])
 
     with left:
-        card_open("Details", "lb-navy", "#2d448d", subtitle="Select a lead to view or edit")
+        card_open("Details", "lb-navy", "#00aeef", subtitle="View & edit lead fields (includes Lead Date calendar)")
 
-        def lead_label(d: dict) -> str:
-            lid = d.get("leadId") or "?"
-            name = (d.get("contactName") or "").strip()
-            status = denormalize_lead_status(d.get("leadStatus") or "") or "—"
-            return f"{lid} — {name} [{status}]"
+        product_opts = product_suggestions()
+        alloc_opts = allocated_to_suggestions()
+        current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+        if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_opts}:
+            alloc_opts = [current_alloc] + alloc_opts
 
-        lead_options = ["(select a lead)"] + [lead_label(d) for d in leads]
-        lead_map = {lead_label(d): d for d in leads}
-
-        st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
-        selected_label = st.selectbox("Select a lead", lead_options, label_visibility="collapsed")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        if selected_label != "(select a lead)":
-            lead = lead_map[selected_label]
-            lead_oid = lead["_id"]
-
-            existing_dt = lead.get("leadDate")
-            if isinstance(existing_dt, datetime):
+        existing_dt = lead.get("leadDate")
+        existing_date_ist = datetime.now(IST).date()
+        if isinstance(existing_dt, datetime):
+            try:
                 existing_date_ist = existing_dt.astimezone(IST).date()
-            else:
+            except Exception:
                 existing_date_ist = datetime.now(IST).date()
 
-            existing_notes = lead.get("notes") or []
-            existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
+        existing_notes: List[dict] = lead.get("notes") if isinstance(lead.get("notes"), list) else []
+        existing_comment_default = ""
+        if existing_notes:
+            try:
+                existing_notes_sorted = sorted(
+                    existing_notes,
+                    key=lambda n: n.get("createdAt") or datetime(1970, 1, 1, tzinfo=timezone.utc),
+                    reverse=True,
+                )
+                existing_comment_default = str(existing_notes_sorted[0].get("text") or "")
+            except Exception:
+                existing_comment_default = ""
 
-            save = False
-            with st.form("edit_lead_form"):
-                c1, c2 = st.columns(2)
 
-                with c1:
-                    leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
-                    companyName = st.text_input("Company", value=lead.get("companyName") or "")
-                    contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
-                    contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
-                    contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
+        with st.form("edit_lead_form"):
+            leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
 
-                with c2:
-                    current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-                    status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
-                    leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
+            companyName = st.text_input("Company", value=lead.get("companyName") or "")
+            contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
+            contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
+            contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
 
-                    alloc_opts = allocated_to_suggestions()
-                    current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+            # --- Lead status (define status_index BEFORE using it) ---
+            current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+            status_index = (
+                LEAD_STATUS_OPTIONS.index(current_status_label)
+                if current_status_label in LEAD_STATUS_OPTIONS
+                else 0
+            )
+            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
 
-                    alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
-                    if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-                        alloc_options.insert(2, current_alloc)
+            # --- Allocated To (default to existing DB value; if none, show None) ---
+            alloc_opts = allocated_to_suggestions()
+            current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
 
+            alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+
+            # Ensure current_alloc is present in list (case-insensitive)
+            if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+                alloc_options.insert(2, current_alloc)
+
+            # Default selection index (case-insensitive)
+            alloc_index = 0  # "None"
+            if current_alloc:
+                try:
+                    alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+                except ValueError:
                     alloc_index = 0
-                    if current_alloc:
-                        try:
-                            alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
-                        except ValueError:
-                            alloc_index = 0
 
-                    allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-                    allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-                    allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+            allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
+            allocTyped = st.text_input(
+                "Or type allocated to (adds new)",
+                value="",
+                placeholder="Type a new name here...",
+            )
 
-                brokerage = st.text_input(
-                    "Brokerage received",
-                    value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
-                )
+            allocatedToDisplayName = (
+                (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else ""))
+                .strip()
+                or None
+            )
 
-                comment_edit = st.text_area(
-                    "Comments (optional)",
-                    value=existing_comment_default,
-                    height=90,
-                    placeholder="Update comment for this lead...",
-                    help="Saving will add this as a new note entry (keeps history).",
-                )
+            brokerage = st.text_input(
+                "Brokerage received",
+                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+            )
 
-                st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
-                save = st.form_submit_button("Save changes")
+            comment_edit = st.text_area(
+                "Comments (optional)",
+                value=existing_comment_default,
+                height=90,
+                placeholder="Update comment for this lead...",
+                help="Saving will add this as a new note entry (keeps history).",
+            )
+
+            st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
+            save = st.form_submit_button("Save changes")
+
+        # NOTE:
+# Your `if save:` line is currently indented deeper (inside a form / column / etc.).
+# The ENTIRE block below must be indented ONE LEVEL MORE than `if save:`.
+
+# Example: if you have:
+#         if save:
+# then everything inside must start with 12 spaces:
+#             ...
 
             if save:
                 # ---- Brokerage parsing ----
@@ -1078,104 +1239,15 @@ if page == "Leads":
                     updates["leadId"] = new_lead_id
                     updates["legacyNumber"] = new_serial
 
+                # ---- Save to DB ----
                 try:
                     update_lead(lead_oid, updates)
                 except DuplicateKeyError:
                     st.error("Lead ID collision occurred. Try saving again.")
                     st.stop()
 
+                # ---- Notes ----
                 if (comment_edit or "").strip():
                     add_note(lead_oid, comment_edit.strip(), created_by=None)
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-        card_close()
-
-    with right:
-        try:
-            df_chart = month_series_counts_df()
-            if not df_chart.empty:
-                card_open("Month-Wise Leads", "lb-cyan", "#00aeef", subtitle="Lead activity over time")
-                st.plotly_chart(plot_month_series(df_chart), use_container_width=True)
-                card_close()
-        except Exception:
-            pass
-
-        is_filtered = (
-            filters.get("status") != "all"
-            or filters.get("allocatedTo") != "all"
-            or filters.get("month_mode") == "month"
-            or bool(filters.get("search"))
-        )
-
-        if is_filtered and leads:
-            card_open("Filtered Leads", "lb-lime", "#a6ce39", subtitle="Matching leads")
-            df_table = pd.DataFrame([
-                {
-                    "Lead ID": d.get("leadId") or "—",
-                    "Name": d.get("contactName") or "—",
-                    "Company": d.get("companyName") or "—",
-                    "Phone": d.get("contactPhone") or "—",
-                    "Email": d.get("contactEmail") or "—",
-                    "Allocated To": safe_get(d, "allocatedTo.displayName") or "—",
-                    "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
-                }
-                for d in leads
-            ])
-            st.dataframe(df_table, use_container_width=True, hide_index=True)
-            card_close()
-
-elif page == "Create Lead":
-    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
-    product_opts = product_suggestions()
-    alloc_opts = allocated_to_suggestions()
-
-    with st.form("create_lead_form"):
-        c1, c2 = st.columns(2)
-
-        with c1:
-            leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
-            companyName = st.text_input("Company")
-            contactName = st.text_input("Contact person")
-            contactEmail = st.text_input("Email id")
-            contactPhone = st.text_input("Phone number")
-
-        with c2:
-            productType = st.selectbox("Product type", ["(none)"] + product_opts)
-            leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
-            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
-            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            brokerage = st.text_input("Brokerage received", value="")
-
-        comment = st.text_area("Comments (optional)", height=90, placeholder="Initial note for this lead...")
-        submitted = st.form_submit_button("Create Lead")
-
-    if submitted:
-        alloc_display = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
-        brokerage_val: Any = brokerage.strip()
-        if brokerage_val == "":
-            brokerage_val = None
-        else:
-            try:
-                brokerage_val = float(brokerage_val)
-            except ValueError:
-                st.error("Brokerage must be a number (or empty).")
-                st.stop()
-
-        new_oid = create_lead({
-            "leadDate": leadDate,
-            "companyName": companyName.strip() or None,
-            "contactName": contactName.strip() or None,
-            "contactEmail": contactEmail.strip() or None,
-            "contactPhone": contactPhone.strip() or None,
-            "productType": None if (productType or "") == "(none)" else productType,
-            "leadStatus": leadStatus,
-            "allocatedToDisplayName": alloc_display,
-            "brokerageReceived": brokerage_val,
-            "comment": comment.strip() or None,
-        })
-        created_doc = leads_col().find_one({"_id": new_oid}, {"leadId": 1})
-        created_lead_id = (created_doc or {}).get("leadId") or str(new_oid)
-        st.success(f"Lead created: {created_lead_id}")
-
-    card_close()
