@@ -1180,52 +1180,66 @@ else:
             st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
             save = st.form_submit_button("Save changes")
 
-        if save:
-    # ---- Brokerage parsing ----
-    brokerage_val: Any = brokerage.strip()
-    if brokerage_val == "":
-        brokerage_val = None
-    else:
-        try:
-            brokerage_val = float(brokerage_val)
-        except ValueError:
-            st.error("Brokerage must be a number (or empty).")
-            st.stop()
+        # NOTE:
+# Your `if save:` line is currently indented deeper (inside a form / column / etc.).
+# The ENTIRE block below must be indented ONE LEVEL MORE than `if save:`.
 
-    # ---- Lead date / Lead ID regeneration ----
-    new_lead_dt_ist = datetime(leadDateEdit.year, leadDateEdit.month, leadDateEdit.day, 0, 0, 0, tzinfo=IST)
+# Example: if you have:
+#         if save:
+# then everything inside must start with 12 spaces:
+#             ...
 
-    current_lead_id = lead.get("leadId")
-    new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
+            if save:
+                # ---- Brokerage parsing ----
+                brokerage_val: Any = brokerage.strip()
+                if brokerage_val == "":
+                    brokerage_val = None
+                else:
+                    try:
+                        brokerage_val = float(brokerage_val)
+                    except ValueError:
+                        st.error("Brokerage must be a number (or empty).")
+                        st.stop()
 
-    # ---- Updates ----
-    updates: dict = {
-        "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
-        "companyName": companyName.strip() or None,
-        "contactName": contactName.strip() or None,
-        "contactEmail": contactEmail.strip() or None,
-        "contactPhone": contactPhone.strip() or None,
-        "leadStatus": normalize_lead_status(leadStatusLabel),
+                # ---- Lead date / Lead ID regeneration ----
+                new_lead_dt_ist = datetime(
+                    leadDateEdit.year,
+                    leadDateEdit.month,
+                    leadDateEdit.day,
+                    0,
+                    0,
+                    0,
+                    tzinfo=IST,
+                )
 
-        # ✅ Persist allocated-to (if None, it will clear displayName)
-        "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
+                current_lead_id = lead.get("leadId")
+                new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
 
-        "brokerageReceived": brokerage_val,
-    }
+                # ---- Updates ----
+                updates: dict = {
+                    "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
+                    "companyName": companyName.strip() or None,
+                    "contactName": contactName.strip() or None,
+                    "contactEmail": contactEmail.strip() or None,
+                    "contactPhone": contactPhone.strip() or None,
+                    "leadStatus": normalize_lead_status(leadStatusLabel),
+                    "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
+                    "brokerageReceived": brokerage_val,
+                }
 
-    if new_lead_id != current_lead_id:
-        updates["leadId"] = new_lead_id
-        updates["legacyNumber"] = new_serial
+                if new_lead_id != current_lead_id:
+                    updates["leadId"] = new_lead_id
+                    updates["legacyNumber"] = new_serial
 
-    # ---- Save to DB ----
-    try:
-        update_lead(lead_oid, updates)
-    except DuplicateKeyError:
-        st.error("Lead ID collision occurred. Try saving again.")
-        st.stop()
+                # ---- Save to DB ----
+                try:
+                    update_lead(lead_oid, updates)
+                except DuplicateKeyError:
+                    st.error("Lead ID collision occurred. Try saving again.")
+                    st.stop()
 
-    # ---- Notes ----
-    if (comment_edit or "").strip():
-        add_note(lead_oid, comment_edit.strip(), created_by=None)
+                # ---- Notes ----
+                if (comment_edit or "").strip():
+                    add_note(lead_oid, comment_edit.strip(), created_by=None)
 
-    st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+                st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
