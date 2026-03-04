@@ -331,43 +331,46 @@ footer { visibility: hidden; }
   background: #fff;
 }
 
-/* STRONG highlight for "Select a lead" area (wrapper + control) */
+/* Highlight "Select a lead" (FIXED: no empty pill/bar, just a clean highlighted card) */
 .lb-lead-picker{
   padding: 14px 14px 12px 14px !important;
   margin: 10px 0 16px 0 !important;
   border-radius: 14px !important;
 
-  /* make the whole section stand out */
-  background: rgba(166, 206, 57, 0.10) !important;
-  border: 2px solid rgba(166, 206, 57, 0.95) !important;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.10) !important;
+  /* subtle card highlight instead of thick lime outline */
+  background: linear-gradient(180deg, rgba(238,242,255,0.85), rgba(255,255,255,1)) !important;
+  border: 1px solid rgba(45, 68, 141, 0.22) !important;
+  box-shadow: 0 10px 22px rgba(45, 68, 141, 0.12) !important;
 }
 
-/* Make the label more visible */
+/* Prevent any accidental decorative bars */
+.lb-lead-picker::before,
+.lb-lead-picker::after{
+  content: none !important;
+  display: none !important;
+}
+
+/* Label: stronger + navy */
 .lb-lead-picker label,
 .lb-lead-picker [data-testid="stWidgetLabel"]{
   font-weight: 900 !important;
-  color: #2d448d !important;
+  color: var(--navy) !important;
   letter-spacing: 0.02em !important;
   margin-bottom: 6px !important;
 }
 
-/* Highlight the actual select box (BaseWeb) */
+/* Select control: slightly stronger than normal inputs */
 .lb-lead-picker [data-baseweb="select"] > div{
   border-radius: 12px !important;
-  border: 2px solid rgba(45, 68, 141, 0.55) !important;
-  background: #ffffff !important;
-  box-shadow:
-    0 10px 22px rgba(45, 68, 141, 0.15),
-    inset 0 0 0 2px rgba(166, 206, 57, 0.35) !important;
+  border: 1px solid rgba(45, 68, 141, 0.35) !important;
+  background: rgba(255,255,255,0.96) !important;
+  box-shadow: 0 8px 18px rgba(45, 68, 141, 0.10) !important;
 }
 
-/* Strong focus ring so it’s obvious when clicked */
+/* Focus ring: clean cyan ring (matches theme) */
 .lb-lead-picker [data-baseweb="select"] > div:focus-within{
-  border-color: rgba(45, 68, 141, 0.95) !important;
-  box-shadow:
-    0 0 0 5px rgba(166, 206, 57, 0.45),
-    0 10px 22px rgba(45, 68, 141, 0.18) !important;
+  border-color: rgba(45, 68, 141, 0.60) !important;
+  box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.22) !important;
 }
 </style>
 """,
