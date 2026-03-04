@@ -1110,52 +1110,64 @@ else:
             except Exception:
                 existing_comment_default = ""
 
+        # IMPORTANT:
+# The line `with st.form("edit_lead_form"):` must be indented to match its surrounding code,
+# and EVERYTHING inside it must be indented ONE LEVEL MORE than that line.
+
+# Example: if `with st.form...` is indented by 8 spaces, then the inside must be 12 spaces.
+
         with st.form("edit_lead_form"):
-    leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
+            leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
 
-    companyName = st.text_input("Company", value=lead.get("companyName") or "")
-    contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
-    contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
-    contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
+            companyName = st.text_input("Company", value=lead.get("companyName") or "")
+            contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
+            contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
+            contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
 
-    # --- Lead status (define status_index BEFORE using it) ---
-    current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-    status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
-    leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
+            # --- Lead status (define status_index BEFORE using it) ---
+            current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+            status_index = (
+                LEAD_STATUS_OPTIONS.index(current_status_label)
+                if current_status_label in LEAD_STATUS_OPTIONS
+                else 0
+            )
+            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
 
-    # --- Allocated To (default to existing DB value; if none, show None) ---
-    # Suggestions list from DB
-    alloc_opts = allocated_to_suggestions()
+            # --- Allocated To (default to existing DB value; if none, show None) ---
+            alloc_opts = allocated_to_suggestions()
+            current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
 
-    # Current value from this lead doc
-    current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+            alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
 
-    # Options shown in the selectbox
-    alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+            # Ensure current_alloc is present in list (case-insensitive)
+            if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+                alloc_options.insert(2, current_alloc)
 
-    # Ensure current_alloc is present in list (case-insensitive), so it can be selected
-    if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-        alloc_options.insert(2, current_alloc)
+            # Default selection index (case-insensitive)
+            alloc_index = 0  # "None"
+            if current_alloc:
+                try:
+                    alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+                except ValueError:
+                    alloc_index = 0
 
-    # Default selection index (case-insensitive)
-    alloc_index = 0  # "None"
-    if current_alloc:
-        try:
-            alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
-        except ValueError:
-            alloc_index = 0
+            allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
+            allocTyped = st.text_input(
+                "Or type allocated to (adds new)",
+                value="",
+                placeholder="Type a new name here...",
+            )
 
-    allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-    allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            allocatedToDisplayName = (
+                (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else ""))
+                .strip()
+                or None
+            )
 
-    allocatedToDisplayName = (
-        (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
-    )
-
-    brokerage = st.text_input(
-        "Brokerage received",
-        value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
-    )
+            brokerage = st.text_input(
+                "Brokerage received",
+                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+            )
 
             comment_edit = st.text_area(
                 "Comments (optional)",
