@@ -1191,7 +1191,7 @@ else:
     save = st.form_submit_button("Save changes")
 
         
-            if save:
+       if save:
                 # ---- Brokerage parsing ----
                 brokerage_val: Any = brokerage.strip()
                 if brokerage_val == "":
