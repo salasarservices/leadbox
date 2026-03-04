@@ -1077,7 +1077,7 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
         card_close()
 
-    st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
+    
 
     def lead_label(d: dict) -> str:
         lid = (d.get("leadId") or "(NO LEADID)").upper()
@@ -1085,7 +1085,7 @@ else:
         stt = denormalize_lead_status(d.get("leadStatus")).upper()
         return f"{lid} — {person} [{stt}]"
 
-    selected = st.selectbox("Select a lead", leads, format_func=lead_label)
+    selected = st.selectbox("Select a lead", leads, format_func=lead_label, key="lead_picker")
     st.markdown("</div>", unsafe_allow_html=True)
 
     lead = selected
@@ -1123,11 +1123,6 @@ else:
             except Exception:
                 existing_comment_default = ""
 
-        # IMPORTANT:
-# The line `with st.form("edit_lead_form"):` must be indented to match its surrounding code,
-# and EVERYTHING inside it must be indented ONE LEVEL MORE than that line.
-
-# Example: if `with st.form...` is indented by 8 spaces, then the inside must be 12 spaces.
 
         with st.form("edit_lead_form"):
             leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
