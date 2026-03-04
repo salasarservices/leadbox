@@ -1125,78 +1125,72 @@ else:
 
 
         with st.form("edit_lead_form"):
-            leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
+    c1, c2 = st.columns(2)
 
-            companyName = st.text_input("Company", value=lead.get("companyName") or "")
-            contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
-            contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
-            contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
+    with c1:
+        leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
 
-            # --- Lead status (define status_index BEFORE using it) ---
-            current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-            status_index = (
-                LEAD_STATUS_OPTIONS.index(current_status_label)
-                if current_status_label in LEAD_STATUS_OPTIONS
-                else 0
-            )
-            leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
+        companyName = st.text_input("Company", value=lead.get("companyName") or "")
+        contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
+        contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
+        contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
 
-            # --- Allocated To (default to existing DB value; if none, show None) ---
-            alloc_opts = allocated_to_suggestions()
-            current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+    with c2:
+        # --- Lead status (define status_index BEFORE using it) ---
+        current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+        status_index = (
+            LEAD_STATUS_OPTIONS.index(current_status_label)
+            if current_status_label in LEAD_STATUS_OPTIONS
+            else 0
+        )
+        leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
 
-            alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+        # --- Allocated To (default to existing DB value; if none, show None) ---
+        alloc_opts = allocated_to_suggestions()
+        current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
 
-            # Ensure current_alloc is present in list (case-insensitive)
-            if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-                alloc_options.insert(2, current_alloc)
+        alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+        if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+            alloc_options.insert(2, current_alloc)
 
-            # Default selection index (case-insensitive)
-            alloc_index = 0  # "None"
-            if current_alloc:
-                try:
-                    alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
-                except ValueError:
-                    alloc_index = 0
+        alloc_index = 0  # "None"
+        if current_alloc:
+            try:
+                alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+            except ValueError:
+                alloc_index = 0
 
-            allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-            allocTyped = st.text_input(
-                "Or type allocated to (adds new)",
-                value="",
-                placeholder="Type a new name here...",
-            )
+        allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
+        allocTyped = st.text_input(
+            "Or type allocated to (adds new)",
+            value="",
+            placeholder="Type a new name here...",
+        )
 
-            allocatedToDisplayName = (
-                (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else ""))
-                .strip()
-                or None
-            )
+        allocatedToDisplayName = (
+            (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else ""))
+            .strip()
+            or None
+        )
 
-            brokerage = st.text_input(
-                "Brokerage received",
-                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
-            )
+    # Full-width fields under both columns (matches Create Lead feel)
+    brokerage = st.text_input(
+        "Brokerage received",
+        value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+    )
 
-            comment_edit = st.text_area(
-                "Comments (optional)",
-                value=existing_comment_default,
-                height=90,
-                placeholder="Update comment for this lead...",
-                help="Saving will add this as a new note entry (keeps history).",
-            )
+    comment_edit = st.text_area(
+        "Comments (optional)",
+        value=existing_comment_default,
+        height=90,
+        placeholder="Update comment for this lead...",
+        help="Saving will add this as a new note entry (keeps history).",
+    )
 
-            st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
-            save = st.form_submit_button("Save changes")
+    st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
+    save = st.form_submit_button("Save changes")
 
-        # NOTE:
-# Your `if save:` line is currently indented deeper (inside a form / column / etc.).
-# The ENTIRE block below must be indented ONE LEVEL MORE than `if save:`.
-
-# Example: if you have:
-#         if save:
-# then everything inside must start with 12 spaces:
-#             ...
-
+        
             if save:
                 # ---- Brokerage parsing ----
                 brokerage_val: Any = brokerage.strip()
