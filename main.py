@@ -581,60 +581,6 @@ def check_db_and_init() -> tuple[bool, str]:
         return False, str(e)
 
 
-# -----------------------
-# Migration: SalLead/SALLEAD -> SL
-# -----------------------
-LEADID_MIGRATION_RE = re.compile(r"^(sallead)(.*)$", re.IGNORECASE)
-
-
-def migrate_lead_ids_to_sl(dry_run: bool = True) -> dict[str, Any]:
-    """
-    One-time migration:
-      SalLeadXXXX -> SLXXXX
-      SALLEADXXXX -> SLXXXX
-    Preserves suffix part after the 'SalLead' token.
-    """
-    col = leads_col()
-
-    cursor = col.find({"leadId": {"$regex": r"^(?i)sallead"}}, {"leadId": 1})
-    ops: list[UpdateOne] = []
-    preview: list[tuple[str, str]] = []
-    seen_new: set[str] = set()
-
-    for d in cursor:
-        old = d.get("leadId")
-        if not isinstance(old, str):
-            continue
-        m = LEADID_MIGRATION_RE.match(old.strip())
-        if not m:
-            continue
-        rest = m.group(2)
-        new = f"{LEAD_ID_PREFIX}{rest}"
-
-        # Basic safety: avoid duplicates in this batch
-        if new in seen_new:
-            raise ValueError(f"Duplicate new leadId generated in batch: {new}")
-        seen_new.add(new)
-
-        preview.append((old, new))
-        if not dry_run:
-            ops.append(UpdateOne({"_id": d["_id"], "leadId": old}, {"$set": {"leadId": new}}))
-
-    result: dict[str, Any] = {"matched": len(preview), "updated": 0, "preview": preview[:25]}
-
-    if dry_run:
-        return result
-
-    if not ops:
-        return result
-
-    try:
-        bulk = col.bulk_write(ops, ordered=True)
-        result["updated"] = int(bulk.modified_count)
-        return result
-    except BulkWriteError as bwe:
-        # likely duplicate key from uniq index
-        raise RuntimeError(f"Bulk migration failed: {bwe.details}") from bwe
 
 
 # -----------------------
