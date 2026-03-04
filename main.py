@@ -331,16 +331,43 @@ footer { visibility: hidden; }
   background: #fff;
 }
 
-/* Highlight "Select a lead" selectbox a bit */
-.lb-lead-picker div[data-baseweb="select"] > div{
-  border: 1px solid rgba(45, 68, 141, 0.35) !important;
-  box-shadow: 0 10px 22px rgba(45, 68, 141, 0.10) !important;
-  background: linear-gradient(180deg, rgba(238,242,255,0.65), #fff) !important;
+/* STRONG highlight for "Select a lead" area (wrapper + control) */
+.lb-lead-picker{
+  padding: 14px 14px 12px 14px !important;
+  margin: 10px 0 16px 0 !important;
+  border-radius: 14px !important;
+
+  /* make the whole section stand out */
+  background: rgba(166, 206, 57, 0.10) !important;
+  border: 2px solid rgba(166, 206, 57, 0.95) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.10) !important;
 }
-.lb-lead-picker label{
+
+/* Make the label more visible */
+.lb-lead-picker label,
+.lb-lead-picker [data-testid="stWidgetLabel"]{
   font-weight: 900 !important;
   color: #2d448d !important;
   letter-spacing: 0.02em !important;
+  margin-bottom: 6px !important;
+}
+
+/* Highlight the actual select box (BaseWeb) */
+.lb-lead-picker [data-baseweb="select"] > div{
+  border-radius: 12px !important;
+  border: 2px solid rgba(45, 68, 141, 0.55) !important;
+  background: #ffffff !important;
+  box-shadow:
+    0 10px 22px rgba(45, 68, 141, 0.15),
+    inset 0 0 0 2px rgba(166, 206, 57, 0.35) !important;
+}
+
+/* Strong focus ring so it’s obvious when clicked */
+.lb-lead-picker [data-baseweb="select"] > div:focus-within{
+  border-color: rgba(45, 68, 141, 0.95) !important;
+  box-shadow:
+    0 0 0 5px rgba(166, 206, 57, 0.45),
+    0 10px 22px rgba(45, 68, 141, 0.18) !important;
 }
 </style>
 """,
