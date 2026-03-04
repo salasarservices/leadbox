@@ -1175,6 +1175,15 @@ else:
             current_status_label = denormalize_lead_status(lead.get("leadStatus"))
             status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
             leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
+            # ✅ Allocated To (place this right after Lead status)
+            alloc_opts = allocated_to_suggestions()
+            current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+            if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_opts}:
+                alloc_opts = [current_alloc] + alloc_opts
+
+            allocPick = st.selectbox("Allocated to (choose)", ["(TYPE NEW)"] + alloc_opts, index=0)
+            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick != "(TYPE NEW)" else current_alloc)).strip() or None
 
             brokerage = st.text_input(
                 "Brokerage received",
