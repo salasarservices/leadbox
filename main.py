@@ -874,24 +874,7 @@ with st.sidebar:
         clear_db_cache()
         st.success("DB cache cleared. Data will refresh on next interaction.")
 
-    # ✅ One-time migration UI
-    with st.expander("Admin: Lead ID migration", expanded=False):
-        st.caption("Convert existing leadId from SalLead/SALLEAD �� SL (one-time).")
-        dry = st.checkbox("Dry run (preview only)", value=True)
-        confirm = st.checkbox("I understand this updates the database", value=False)
-
-        if st.button("Migrate Lead IDs to SL", use_container_width=True, disabled=(not confirm and not dry)):
-            try:
-                result = migrate_lead_ids_to_sl(dry_run=dry)
-                if dry:
-                    st.success(f"Dry run: {result['matched']} leads would be updated.")
-                    if result["preview"]:
-                        st.write("Preview (first 25):")
-                        st.dataframe(pd.DataFrame(result["preview"], columns=["old", "new"]), use_container_width=True, hide_index=True)
-                else:
-                    st.success(f"Migration complete. Updated: {result['updated']} leads.")
-            except Exception as e:
-                st.error(str(e))
+    # ❌ Removed: Admin: Lead ID migration (no longer shown in sidebar)
 
     card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
     page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
