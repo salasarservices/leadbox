@@ -953,7 +953,7 @@ if page == "Create Lead":
     alloc_opts = allocated_to_suggestions()
 
     with st.form("edit_lead_form"):
-    c1, c2 = st.columns(2)
+        c1, c2 = st.columns(2)
 
     with c1:
         leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
