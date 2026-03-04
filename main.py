@@ -373,29 +373,6 @@ footer { visibility: hidden; }
   box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.22) !important;
 }
 </style>
-/* 2) Put this at the VERY END of your <style> block (bottom-most), so it overrides everything */
-
-/* Debug border: if you don't see this red border, the selector isn't matching */
-div[data-testid="stSelectbox"][data-key="lead_picker"]{
-  outline: 3px solid red !important;
-  padding: 10px !important;
-  border-radius: 14px !important;
-}
-
-/* Actual highlight styling */
-div[data-testid="stSelectbox"][data-key="lead_picker"] [data-baseweb="select"] > div{
-  border-radius: 12px !important;
-  border: 2px solid rgba(166, 206, 57, 0.95) !important;
-  background: linear-gradient(180deg, rgba(243,250,230,0.95), #fff) !important;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14) !important;
-}
-
-div[data-testid="stSelectbox"][data-key="lead_picker"] label,
-div[data-testid="stSelectbox"][data-key="lead_picker"] [data-testid="stWidgetLabel"]{
-  font-weight: 900 !important;
-  color: #2d448d !important;
-  letter-spacing: 0.02em !important;
-}
 """,
     unsafe_allow_html=True,
 )
