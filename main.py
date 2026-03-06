@@ -331,16 +331,15 @@ footer { visibility: hidden; }
   background: #fff;
 }
 
-/* Highlight "Select a lead" (FIXED: no empty pill/bar, just a clean highlighted card) */
+/* Highlight lead picker without decorative gradient bars */
 .lb-lead-picker{
   padding: 14px 14px 12px 14px !important;
   margin: 10px 0 16px 0 !important;
   border-radius: 14px !important;
 
-  /* subtle card highlight instead of thick lime outline */
-  background: linear-gradient(180deg, rgba(238,242,255,0.85), rgba(255,255,255,1)) !important;
-  border: 1px solid rgba(45, 68, 141, 0.22) !important;
-  box-shadow: 0 10px 22px rgba(45, 68, 141, 0.12) !important;
+  background: #f4f7ff !important;
+  border: 1px solid rgba(45, 68, 141, 0.20) !important;
+  box-shadow: 0 8px 18px rgba(45, 68, 141, 0.10) !important;
 }
 
 /* Prevent any accidental decorative bars */
@@ -363,7 +362,7 @@ footer { visibility: hidden; }
 .lb-lead-picker [data-baseweb="select"] > div{
   border-radius: 12px !important;
   border: 1px solid rgba(45, 68, 141, 0.35) !important;
-  background: rgba(255,255,255,0.96) !important;
+  background: #ffffff !important;
   box-shadow: 0 8px 18px rgba(45, 68, 141, 0.10) !important;
 }
 
@@ -966,14 +965,17 @@ if page == "Leads":
             status = denormalize_lead_status(d.get("leadStatus") or "") or "—"
             return f"{lid} — {name} [{status}]"
 
-        lead_options = ["(select a lead)"] + [lead_label(d) for d in leads]
+        lead_options = [lead_label(d) for d in leads]
         lead_map = {lead_label(d): d for d in leads}
 
         st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
-        selected_label = st.selectbox("Select a lead", lead_options, label_visibility="collapsed")
+        if lead_options:
+            selected_label = st.selectbox("Select a lead", lead_options, index=0)
+        else:
+            selected_label = st.selectbox("Select a lead", ["(no leads found)"], index=0)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        if selected_label != "(select a lead)":
+        if selected_label in lead_map:
             lead = lead_map[selected_label]
             lead_oid = lead["_id"]
 
