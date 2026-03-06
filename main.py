@@ -331,45 +331,41 @@ footer { visibility: hidden; }
   background: #fff;
 }
 
-/* Highlight lead picker without decorative gradient bars */
-.lb-lead-picker{
-  padding: 14px 14px 12px 14px !important;
-  margin: 10px 0 16px 0 !important;
-  border-radius: 14px !important;
-
-  background: #f4f7ff !important;
-  border: 1px solid rgba(45, 68, 141, 0.20) !important;
-  box-shadow: 0 8px 18px rgba(45, 68, 141, 0.10) !important;
+/* Lead picker heading (avoid wrapper artifacts above dropdown) */
+.lb-lead-picker-title{
+  margin: 8px 0 6px 0;
+  font-weight: 900;
+  color: var(--navy);
+  letter-spacing: 0.02em;
 }
 
-/* Prevent any accidental decorative bars */
-.lb-lead-picker::before,
-.lb-lead-picker::after{
-  content: none !important;
-  display: none !important;
+/* Read-only comments section */
+.lb-comments-view{
+  background: var(--pastel-lime);
+  border: 1px solid rgba(90, 127, 17, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
 }
-
-/* Label: stronger + navy */
-.lb-lead-picker label,
-.lb-lead-picker [data-testid="stWidgetLabel"]{
-  font-weight: 900 !important;
-  color: var(--navy) !important;
-  letter-spacing: 0.02em !important;
-  margin-bottom: 6px !important;
+.lb-comment-item{
+  padding: 8px 0;
 }
-
-/* Select control: slightly stronger than normal inputs */
-.lb-lead-picker [data-baseweb="select"] > div{
-  border-radius: 12px !important;
-  border: 1px solid rgba(45, 68, 141, 0.35) !important;
-  background: #ffffff !important;
-  box-shadow: 0 8px 18px rgba(45, 68, 141, 0.10) !important;
+.lb-comment-meta{
+  color: #4d7c0f;
+  font-size: 0.80rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
-
-/* Focus ring: clean cyan ring (matches theme) */
-.lb-lead-picker [data-baseweb="select"] > div:focus-within{
-  border-color: rgba(45, 68, 141, 0.60) !important;
-  box-shadow: 0 0 0 4px rgba(0, 174, 239, 0.22) !important;
+.lb-comment-text{
+  color: #1f2937;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lb-comment-divider{
+  border-top: 1px solid rgba(90, 127, 17, 0.24);
+  margin: 2px 0;
 }
 </style>
 """,
@@ -440,6 +436,32 @@ def format_inr_compact(amount: float) -> str:
     if x >= 1e3:
         return fmt(x / 1e3, "K")
     return f"{sign}₹{int(round(x))}"
+
+
+def format_note_datetime_ist(value: Any) -> str:
+    if isinstance(value, datetime):
+        dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        dt_ist = dt.astimezone(IST)
+        return dt_ist.strftime("%d %b %Y • %I:%M %p IST")
+    return "Unknown timestamp"
+
+
+def comments_view_html(notes: list[dict]) -> str:
+    if not notes:
+        return '<div class="lb-comments-view"><div class="lb-comment-text">No comments available for this lead.</div></div>'
+
+    rows: list[str] = ['<div class="lb-comments-view">']
+    for i, note in enumerate(notes):
+        text = str((note or {}).get("text") or "").strip() or "(empty comment)"
+        ts = format_note_datetime_ist((note or {}).get("createdAt"))
+        rows.append('<div class="lb-comment-item">')
+        rows.append(f'<div class="lb-comment-meta">{ts}</div>')
+        rows.append(f'<div class="lb-comment-text">{text}</div>')
+        rows.append('</div>')
+        if i < len(notes) - 1:
+            rows.append('<div class="lb-comment-divider"></div>')
+    rows.append('</div>')
+    return "".join(rows)
 
 
 def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
@@ -968,15 +990,16 @@ if page == "Leads":
         lead_options = [lead_label(d) for d in leads]
         lead_map = {lead_label(d): d for d in leads}
 
-        st.markdown('<div class="lb-lead-picker">', unsafe_allow_html=True)
+        st.markdown('<div class="lb-lead-picker-title">Select a lead</div>', unsafe_allow_html=True)
         if lead_options:
-            selected_label = st.selectbox("Select a lead", lead_options, index=0)
+            selected_label = st.selectbox("Select a lead", lead_options, index=0, label_visibility="collapsed")
         else:
-            selected_label = st.selectbox("Select a lead", ["(no leads found)"], index=0)
-        st.markdown("</div>", unsafe_allow_html=True)
+            selected_label = st.selectbox("Select a lead", ["(no leads found)"], index=0, label_visibility="collapsed")
 
-        if selected_label in lead_map:
-            lead = lead_map[selected_label]
+        selected_lead = lead_map.get(selected_label)
+
+        if selected_lead:
+            lead = selected_lead
             lead_oid = lead["_id"]
 
             existing_dt = lead.get("leadDate")
@@ -1102,6 +1125,19 @@ if page == "Leads":
                 card_close()
         except Exception:
             pass
+
+        if selected_lead:
+            card_open("Comments", "lb-lime", "#a6ce39", subtitle="Read-only timeline from database")
+            notes = [n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)]
+            notes_sorted = sorted(
+                notes,
+                key=lambda n: (
+                    n.get("createdAt") if isinstance(n.get("createdAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc)
+                ),
+                reverse=True,
+            )
+            st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
+            card_close()
 
         is_filtered = (
             filters.get("status") != "all"
