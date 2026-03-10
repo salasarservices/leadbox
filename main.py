@@ -427,6 +427,23 @@ def db_status_pill(ok: bool, detail: str = ""):
     )
 
 
+def parse_money(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if not s:
+        return None
+    s = re.sub(r"[^0-9.\-]", "", s)
+    if not s or s in {"-", ".", "-."}:
+        return None
+    try:
+        return float(s)
+    except Exception:
+        return None
+
+
 def format_inr_compact(amount: float) -> str:
     try:
         x = float(amount)
