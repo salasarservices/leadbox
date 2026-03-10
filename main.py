@@ -244,7 +244,7 @@ div[data-baseweb="select"] * { text-transform: uppercase; }
 #MainMenu { visibility: hidden; }
 footer { visibility: hidden; }
 
-/* KPI circles */
+/* KPI boxes */
 .kpi-row{
   display:flex;
   gap:18px;
@@ -253,95 +253,154 @@ footer { visibility: hidden; }
   align-items: flex-start;
 }
 .kpi-wrap{
-  width: 150px;
+  width: 170px;
   display:flex;
   flex-direction: column;
   align-items: center;
 }
-.kpi-circle{
-  width: 112px;
-  height: 112px;
-  border-radius: 999px;
+.kpi{
+  width: 170px;
+  height: 108px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
   display:flex;
   align-items:center;
   justify-content:center;
-  box-shadow: var(--shadow);
-  border: 2px solid rgba(15,23,42,0.06);
-  background: #fff;
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
-.kpi-val{
-  font-size: 1.45rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+.kpi:hover{
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.10);
 }
-.kpi-label{
-  margin-top: 8px;
+.kpi-inner{
   text-align:center;
+  padding: 12px;
+}
+.kpi-number{
+  font-size: 2.2rem;
+  font-weight: 900;
+  line-height: 1.05;
+  color: var(--text);
+}
+.kpi-number.navy{ color: var(--navy); }
+.kpi-number.cyan{ color: var(--cyan); }
+.kpi-number.lime{ color: #5a7f11; }
+
+.kpi-sub{
+  margin-top: 4px;
+  font-size: 0.78rem;
   color: var(--muted);
-  font-size: 0.82rem;
-  line-height:1.2;
   text-transform: uppercase;
-  letter-spacing: .03em;
+  letter-spacing: 0.06em;
+  font-weight: 800;
 }
-.kpi-total .kpi-circle{ background: linear-gradient(180deg, #eaf0ff, #ffffff); border-color:#dbe5ff; }
-.kpi-int .kpi-circle{ background: linear-gradient(180deg, #e9f7ee, #ffffff); border-color:#d2efdb; }
-.kpi-nint .kpi-circle{ background: linear-gradient(180deg, #fff3e9, #ffffff); border-color:#ffe1c8; }
-.kpi-closed .kpi-circle{ background: linear-gradient(180deg, #f4ecff, #ffffff); border-color:#e5d6ff; }
-.kpi-brok .kpi-circle{ background: linear-gradient(180deg, #e8f9ff, #ffffff); border-color:#c9efff; }
-
-/* Lead picker title */
-.lb-lead-picker-title{
-  font-weight:700;
-  color:#2d448d;
-  font-size:0.9rem;
-  text-transform:uppercase;
-  margin-bottom:0.25rem;
-  letter-spacing:.04em;
+.kpi-title-below{
+  margin-top: 10px;
+  text-align:center;
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-/* Comments timeline */
-.lb-comments-view{
-  max-height: 380px;
-  overflow: auto;
-  padding-right: 4px;
-}
-.lb-comment-item{
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:10px 12px;
-  margin-bottom:8px;
+/* DB status pill */
+.db-pill{
+  display:flex; align-items:center; gap:8px;
+  padding:8px 10px; border-radius:12px;
+  border:1px solid rgba(15,23,42,0.08);
   background:#fff;
 }
+.db-dot{
+  width:10px;height:10px;border-radius:999px;
+}
+.db-text{
+  font-size:0.88rem;color:#0f172a;font-weight:800;
+}
+.db-sub{
+  font-size:0.78rem;color:#64748b;margin-top:-2px;
+}
+
+/* Scrollable dataframe container */
+.lb-table-wrap{
+  border: 1px solid rgba(15,23,42,0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  padding: 10px;
+  background: #fff;
+}
+
+/* Lead picker heading (avoid wrapper artifacts above dropdown) */
+.lb-lead-picker-title{
+  margin: 8px 0 6px 0;
+  font-weight: 900;
+  color: var(--navy);
+  letter-spacing: 0.02em;
+}
+
+/* Read-only comments section */
+.lb-comments-view{
+  background: var(--pastel-lime);
+  border: 1px solid rgba(90, 127, 17, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+.lb-comment-item{
+  padding: 8px 0;
+}
 .lb-comment-meta{
-  color:var(--muted);
-  font-size:0.78rem;
-  margin-bottom:6px;
+  color: #4d7c0f;
+  font-size: 0.80rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .lb-comment-text{
-  color:#0f172a;
-  font-size:0.9rem;
-  line-height:1.35;
-  white-space:pre-wrap;
-  word-wrap:break-word;
+  color: #1f2937;
+  font-size: 0.92rem;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
+.lb-comment-divider{
+  border-top: 1px solid rgba(90, 127, 17, 0.24);
+  margin: 2px 0;
+}
+
+/* Filtered leads table header styling */
+div[data-testid="stDataFrame"] [role="columnheader"] {
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+}
+
+div[data-testid="stDataFrame"] [role="columnheader"] * {
+  font-weight: 800 !important;
+  text-align: center !important;
+  justify-content: center !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
 )
 
 
-def card_open(title: str, tone: str, dot_color: str, subtitle: Optional[str] = None):
+# -----------------------
+# UI helpers
+# -----------------------
+def card_open(title: str, variant: str, dot_color: str, subtitle: str | None = None):
+    sub = f'<div class="lb-subtitle">{subtitle}</div>' if subtitle else ""
     st.markdown(
         f"""
-        <div class="lb-card {tone}">
-          <div class="lb-card-header">
-            <div class="lb-dot" style="background:{dot_color};"></div>
-            <div>
-              <div class="lb-title">{title}</div>
-              {"<div class='lb-subtitle'>" + subtitle + "</div>" if subtitle else ""}
-            </div>
-          </div>
-        """,
+<div class="lb-card {variant}">
+  <div class="lb-card-header">
+    <div class="lb-dot" style="background:{dot_color};"></div>
+    <div>
+      <div class="lb-title">{title}</div>
+      {sub}
+    </div>
+  </div>
+""",
         unsafe_allow_html=True,
     )
 
@@ -350,126 +409,164 @@ def card_close():
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, brokerage: float) -> str:
-    brok = f"₹{brokerage:,.0f}" if brokerage else "₹0"
-    return f"""
-    <div class="kpi-row">
-      <div class="kpi-wrap kpi-total">
-        <div class="kpi-circle"><div class="kpi-val">{total}</div></div>
-        <div class="kpi-label">TOTAL LEADS</div>
-      </div>
-      <div class="kpi-wrap kpi-int">
-        <div class="kpi-circle"><div class="kpi-val">{interested}</div></div>
-        <div class="kpi-label">INTERESTED</div>
-      </div>
-      <div class="kpi-wrap kpi-nint">
-        <div class="kpi-circle"><div class="kpi-val">{not_interested}</div></div>
-        <div class="kpi-label">NOT INTERESTED</div>
-      </div>
-      <div class="kpi-wrap kpi-closed">
-        <div class="kpi-circle"><div class="kpi-val">{closed}</div></div>
-        <div class="kpi-label">CLOSED</div>
-      </div>
-      <div class="kpi-wrap kpi-brok">
-        <div class="kpi-circle"><div class="kpi-val" style="font-size:1.08rem">{brok}</div></div>
-        <div class="kpi-label">BROKERAGE RECEIVED</div>
-      </div>
-    </div>
-    """
+def db_status_pill(ok: bool, detail: str = ""):
+    color = "#22c55e" if ok else "#ef4444"
+    text = "DB STATUS: OK" if ok else "DB STATUS: ERROR"
+    sub = detail or ("Connected • indexes OK" if ok else "Check MongoDB URI / permissions / cluster")
+    st.markdown(
+        f"""
+<div class="db-pill">
+  <div class="db-dot" style="background:{color};"></div>
+  <div>
+    <div class="db-text">{text}</div>
+    <div class="db-sub">{sub}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def format_inr_compact(amount: float) -> str:
+    try:
+        x = float(amount)
+    except Exception:
+        return "₹0"
+
+    sign = "-" if x < 0 else ""
+    x = abs(x)
+
+    def fmt(value: float, suffix: str) -> str:
+        if abs(value - round(value)) < 1e-9:
+            return f"{sign}₹{int(round(value))}{suffix}"
+        return f"{sign}₹{value:.1f}{suffix}"
+
+    if x >= 1e7:
+        return fmt(x / 1e7, "Cr")
+    if x >= 1e5:
+        return fmt(x / 1e5, "L")
+    if x >= 1e3:
+        return fmt(x / 1e3, "K")
+    return f"{sign}₹{int(round(x))}"
+
+
+def format_note_datetime_ist(value: Any) -> str:
+    if isinstance(value, datetime):
+        dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        dt_ist = dt.astimezone(IST)
+        return dt_ist.strftime("%d %b %Y • %I:%M %p IST")
+    return "Unknown timestamp"
 
 
 def comments_view_html(notes: list[dict]) -> str:
     if not notes:
         return '<div class="lb-comments-view"><div class="lb-comment-text">No comments available for this lead.</div></div>'
 
-    rows = []
-    for n in notes:
-        txt = str(n.get("text") or "").strip()
-        if not txt:
-            continue
-        created_at = n.get("createdAt")
-        created_by = n.get("createdBy")
-        who = "System"
-        if isinstance(created_by, dict):
-            who = created_by.get("displayName") or created_by.get("email") or "User"
+    rows: list[str] = ['<div class="lb-comments-view">']
+    for i, note in enumerate(notes):
+        text = str((note or {}).get("text") or "").strip() or "(empty comment)"
+        ts = format_note_datetime_ist((note or {}).get("createdAt"))
+        rows.append('<div class="lb-comment-item">')
+        rows.append(f'<div class="lb-comment-meta">{ts}</div>')
+        rows.append(f'<div class="lb-comment-text">{text}</div>')
+        rows.append('</div>')
+        if i < len(notes) - 1:
+            rows.append('<div class="lb-comment-divider"></div>')
+    rows.append('</div>')
+    return "".join(rows)
 
-        if isinstance(created_at, datetime):
-            ts = created_at.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
-        else:
-            ts = "Unknown time"
 
-        rows.append(
-            f"""
-            <div class="lb-comment-item">
-              <div class="lb-comment-meta">{who} • {ts}</div>
-              <div class="lb-comment-text">{txt}</div>
-            </div>
-            """
-        )
+def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
+    brok = format_inr_compact(total_brokerage)
+    return f"""
+<div class="kpi-row">
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number navy">{total}</div>
+        <div class="kpi-sub">Leads</div>
+      </div>
+    </div>
+    <div class="kpi-title-below">Total Leads</div>
+  </div>
 
-    if not rows:
-        return '<div class="lb-comments-view"><div class="lb-comment-text">No comments available for this lead.</div></div>'
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-lime), #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number lime">{interested}</div>
+        <div class="kpi-sub">Leads</div>
+      </div>
+    </div>
+    <div class="kpi-title-below">Interested</div>
+  </div>
 
-    return f'<div class="lb-comments-view">{"".join(rows)}</div>'
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
+        <div class="kpi-sub">Leads</div>
+      </div>
+    </div>
+    <div class="kpi-title-below">Not Interested</div>
+  </div>
+
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-cyan), #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number cyan">{closed}</div>
+        <div class="kpi-sub">Leads</div>
+      </div>
+    </div>
+    <div class="kpi-title-below">Closed</div>
+  </div>
+
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number" style="color:#9a3412;">{brok}</div>
+        <div class="kpi-sub">INR</div>
+      </div>
+    </div>
+    <div class="kpi-title-below">Total Brokerage</div>
+  </div>
+</div>
+"""
 
 
 # -----------------------
-# DB helpers
+# Mongo helpers
 # -----------------------
-@st.cache_resource(show_spinner=False)
-def get_mongo_client() -> MongoClient:
-    uri = st.secrets.get(SECRET_KEY_LEADS) or os.environ.get("MONGO_URI_LEADS")
+@st.cache_resource
+def mongo_client() -> MongoClient:
+    uri = st.secrets.get(SECRET_KEY_LEADS)
     if not uri:
-        raise RuntimeError(
-            f"Missing Mongo URI. Set Streamlit secret '{SECRET_KEY_LEADS}' or env MONGO_URI_LEADS."
-        )
-    return MongoClient(uri, serverSelectionTimeoutMS=6000)
+        st.error(f"Missing Streamlit secret: {SECRET_KEY_LEADS}")
+        st.stop()
+    return MongoClient(uri)
 
 
-def db():
-    return get_mongo_client()[DB_NAME]
+def clear_db_cache() -> None:
+    st.cache_resource.clear()
 
 
 def leads_col():
-    return db()[COLL_LEADS]
+    return mongo_client()[DB_NAME][COLL_LEADS]
 
 
-def clear_db_cache():
-    get_mongo_client.clear()
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
-def db_status_pill(ok: bool, detail: str):
-    color = "#16a34a" if ok else "#dc2626"
-    bg = "#ecfdf3" if ok else "#fef2f2"
-    txt = f"DB: {'Connected' if ok else 'Not Connected'}"
-    st.markdown(
-        f"""
-        <div style="
-            border:1px solid rgba(15,23,42,0.08);
-            border-radius:10px;padding:8px 10px;margin:4px 0 10px 0;
-            background:{bg};font-size:0.82rem;">
-          <span style="
-            display:inline-block;width:8px;height:8px;border-radius:999px;
-            background:{color};margin-right:7px;vertical-align:middle;"></span>
-          <span style="font-weight:700;color:#0f172a;">{txt}</span>
-          <div style="color:#64748b;margin-top:3px;">{detail}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+def safe_get(d: dict, path: str, default=None):
+    cur = d
+    for p in path.split("."):
+        if not isinstance(cur, dict) or p not in cur:
+            return default
+        cur = cur[p]
+    return cur
 
 
-def check_db_and_init() -> tuple[bool, str]:
-    try:
-        client = get_mongo_client()
-        client.admin.command("ping")
-        ensure_indexes()
-        return True, f"{DB_NAME}.{COLL_LEADS}"
-    except Exception as e:
-        return False, str(e)
-
-
-def month_bounds_utc(year: int, month: int) -> tuple[datetime, datetime]:
+def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     start_ist = datetime(year, month, 1, 0, 0, 0, tzinfo=IST)
     if month == 12:
         end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
@@ -478,27 +575,32 @@ def month_bounds_utc(year: int, month: int) -> tuple[datetime, datetime]:
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
 
 
+# -----------------------
+# LeadId helpers (prefix SL)
+# -----------------------
 def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
+    nn = str(int(serial)).zfill(2)
     mmm = MONTHS[lead_date_ist.month - 1]
     yy = str(lead_date_ist.year)[-2:]
-    return f"{LEAD_ID_PREFIX}{serial:02d}{mmm}{yy}"
+    return f"{LEAD_ID_PREFIX}{nn}{mmm}{yy}"
 
 
 def next_serial_for_month(lead_date_ist: datetime) -> int:
     col = leads_col()
     start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
 
-    docs = list(
+    arr = list(
         col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1})
+        .sort([("legacyNumber", DESCENDING)])
+        .limit(1)
     )
+    if not arr:
+        return 1
 
-    max_legacy = 0
-    for d in docs:
-        n = d.get("legacyNumber")
-        if isinstance(n, int) and n > max_legacy:
-            max_legacy = n
-
-    return max_legacy + 1
+    try:
+        return int(arr[0].get("legacyNumber")) + 1
+    except Exception:
+        return 1
 
 
 def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
@@ -508,7 +610,7 @@ def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_i
 
     mmm = MONTHS[target_lead_date_ist.month - 1]
     yy = str(target_lead_date_ist.year)[-2:]
-    suffix = f"{mmm}{yy}"
+    suffix = f"{mmm}{yy}".upper()
 
     if existing_lead_id.upper().endswith(suffix):
         return existing_lead_id, -1
@@ -517,172 +619,169 @@ def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_i
     return make_lead_id(serial, target_lead_date_ist), serial
 
 
+# -----------------------
+# DB init + indexes
+# -----------------------
 def ensure_indexes():
     col = leads_col()
-    existing = set(col.index_information().keys())
+    existing = col.index_information()
     if "uniq_leadId" not in existing:
         col.create_index([("leadId", ASCENDING)], unique=True, name="uniq_leadId")
     if "idx_leadDate" not in existing:
         col.create_index([("leadDate", ASCENDING)], name="idx_leadDate")
     if "idx_leadStatus" not in existing:
         col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
+    if "idx_allocatedTo" not in existing:
+        col.create_index([("allocatedTo.displayName", ASCENDING)], name="idx_allocatedTo")
 
 
-# -----------------------
-# Misc utils
-# -----------------------
-def safe_get(d: dict, path: str, default=None):
-    cur = d
-    for k in path.split("."):
-        if not isinstance(cur, dict):
-            return default
-        cur = cur.get(k)
-        if cur is None:
-            return default
-    return cur
-
-
-def parse_money(x: Any) -> Optional[float]:
-    if x is None:
-        return None
-    s = str(x).strip()
-    if not s:
-        return None
-    s = re.sub(r"[,\s₹$]", "", s)
+def check_db_and_init() -> tuple[bool, str]:
     try:
-        return float(s)
-    except Exception:
-        return None
+        mongo_client().admin.command("ping")
+        ensure_indexes()
+        return True, "Connected • indexes OK"
+    except Exception as e:
+        return False, str(e)
 
 
-@st.cache_data(show_spinner=False, ttl=60)
+
+
+# -----------------------
+# Suggestions
+# -----------------------
 def product_suggestions() -> list[str]:
     col = leads_col()
-    vals = col.distinct("productType")
-    vals = [v.strip() for v in vals if isinstance(v, str) and v.strip()]
-    merged = sorted(set(DEFAULT_PRODUCT_TYPES + vals), key=lambda s: s.lower())
+    db_values = [p for p in col.distinct("productType") if isinstance(p, str) and p.strip()]
+
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
+        key = item.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            merged.append(item.strip())
     return merged
 
 
-@st.cache_data(show_spinner=False, ttl=60)
 def allocated_to_suggestions() -> list[str]:
     col = leads_col()
-    vals = col.distinct("allocatedTo.displayName")
-    vals = [v.strip() for v in vals if isinstance(v, str) and v.strip()]
-    return sorted(set(vals), key=lambda s: s.lower())
+    names = [a for a in col.distinct("allocatedTo.displayName") if isinstance(a, str) and a.strip()]
+    return sorted({n.strip() for n in names}, key=lambda x: x.lower())
 
 
-@st.cache_data(show_spinner=False, ttl=30)
 def month_lead_counts(year: int) -> dict[int, int]:
     col = leads_col()
-    start_ist = datetime(year, 1, 1, tzinfo=IST)
-    end_ist = datetime(year + 1, 1, 1, tzinfo=IST)
+
+    start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
+    end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
 
     pipeline = [
         {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
         {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
         {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
     ]
-    out = {m: 0 for m in range(1, 13)}
-    for row in col.aggregate(pipeline):
-        m = int(row["_id"])
-        out[m] = int(row["count"])
-    return out
+    res = list(col.aggregate(pipeline))
+    return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
 
 
-@st.cache_data(show_spinner=False, ttl=60)
-def earliest_year_available() -> int:
+# -----------------------
+# Continuous month chart (Plotly)
+# -----------------------
+def first_month_in_db() -> datetime:
     col = leads_col()
     doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
     if not doc:
-        return datetime.now(IST).year
+        now = datetime.now(IST)
+        return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
+
     dt = doc[0].get("leadDate")
-    if not isinstance(dt, datetime):
-        return datetime.now(IST).year
-    return dt.astimezone(IST).year
+    if isinstance(dt, datetime):
+        dt_ist = dt.astimezone(IST)
+        return datetime(dt_ist.year, dt_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    now = datetime.now(IST)
+    return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
 
 
-@st.cache_data(show_spinner=False, ttl=30)
 def month_series_counts_df() -> pd.DataFrame:
     col = leads_col()
-    start_utc = datetime(2020, 1, 1, tzinfo=timezone.utc)
-    end_utc = datetime(2101, 1, 1, tzinfo=timezone.utc)
+
+    start_m = first_month_in_db()
+    now_ist = datetime.now(IST)
+    end_m = datetime(now_ist.year, now_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    start_utc = start_m.astimezone(timezone.utc)
+
+    if end_m.month == 12:
+        end_excl_ist = datetime(end_m.year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+    else:
+        end_excl_ist = datetime(end_m.year, end_m.month + 1, 1, 0, 0, 0, tzinfo=IST)
+    end_utc = end_excl_ist.astimezone(timezone.utc)
 
     pipeline = [
         {"$match": {"leadDate": {"$gte": start_utc, "$lt": end_utc}}},
         {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
         {"$group": {"_id": {"y": "$leadDateIST.year", "m": "$leadDateIST.month"}, "count": {"$sum": 1}}},
-        {"$sort": {"_id.y": 1, "_id.m": 1}},
     ]
-    rows = []
-    for r in col.aggregate(pipeline):
-        y = int(r["_id"]["y"])
-        m = int(r["_id"]["m"])
-        c = int(r["count"])
-        rows.append({"year": y, "month": m, "count": c})
+    res = list(col.aggregate(pipeline))
+    counts = {(int(r["_id"]["y"]), int(r["_id"]["m"])): int(r["count"]) for r in res if r.get("_id")}
 
-    if not rows:
-        return pd.DataFrame(columns=["date", "count", "label"])
+    rows: List[Dict[str, Any]] = []
+    y, m = start_m.year, start_m.month
+    while True:
+        label = f"{MONTHS[m-1]} {str(y)[-2:]}"
+        month_start_ist = datetime(y, m, 1, 0, 0, 0, tzinfo=IST)
+        rows.append({"label": label, "month_start": month_start_ist, "count": int(counts.get((y, m), 0))})
 
-    df = pd.DataFrame(rows)
-    df["date"] = pd.to_datetime(df["year"].astype(str) + "-" + df["month"].astype(str) + "-01")
-    df["label"] = df["date"].dt.strftime("%b %Y")
-    return df.sort_values("date").reset_index(drop=True)
+        if y == end_m.year and m == end_m.month:
+            break
+
+        if m == 12:
+            y += 1
+            m = 1
+        else:
+            m += 1
+
+    return pd.DataFrame(rows).sort_values("month_start", ascending=True)
 
 
 def plot_month_series(df: pd.DataFrame) -> go.Figure:
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=df["date"],
+            x=df["label"],
             y=df["count"],
             mode="lines+markers",
-            line=dict(color="#2d448d", width=2),
-            marker=dict(size=7, color="#00aeef"),
-            hovertemplate="%{x|%b %Y}<br>Leads: %{y}<extra></extra>",
-            name="Leads",
+            line=dict(color="#00aeef", width=3),
+            marker=dict(size=7, color="#2d448d", line=dict(width=1, color="white")),
+            hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
         )
     )
     fig.update_layout(
-        margin=dict(l=20, r=20, t=20, b=20),
-        height=290,
-        xaxis=dict(title="", tickformat="%b\n%Y", showgrid=False),
-        yaxis=dict(title="", rangemode="tozero", gridcolor="rgba(15,23,42,0.08)"),
-        plot_bgcolor="white",
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
         paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial", size=12, color="#0f172a"),
+        xaxis=dict(title="", tickangle=-35, showgrid=False, zeroline=False, tickfont=dict(color="#475569")),
+        yaxis=dict(title="", gridcolor="rgba(15, 23, 42, 0.08)", zeroline=False, tickfont=dict(color="#475569")),
         showlegend=False,
     )
     return fig
 
 
 # -----------------------
-# Query + transforms
+# CRUD
 # -----------------------
-def build_query(filters: dict) -> dict:
-    q: dict[str, Any] = {}
-
-    if filters["status"] and filters["status"] != "all":
+def build_query(filters: dict) -> Dict[str, Any]:
+    q: Dict[str, Any] = {}
+    if filters.get("status") and filters["status"] != "all":
         q["leadStatus"] = normalize_lead_status(filters["status"])
-
-    if filters["allocatedTo"] and filters["allocatedTo"] != "all":
+    if filters.get("allocatedTo") and filters["allocatedTo"] != "all":
         q["allocatedTo.displayName"] = filters["allocatedTo"]
-
-    if filters["month_mode"] == "month":
+    if filters.get("month_mode") == "month":
         start_utc, end_utc = month_bounds_utc(filters["month_year"], filters["month_num"])
         q["leadDate"] = {"$gte": start_utc, "$lt": end_utc}
-
-    s = (filters.get("search") or "").strip()
-    if s:
-        rx = re.compile(re.escape(s), re.IGNORECASE)
-        q["$or"] = [
-            {"leadId": rx},
-            {"contactName": rx},
-            {"companyName": rx},
-            {"contactEmail": rx},
-            {"contactPhone": rx},
-            {"allocatedTo.displayName": rx},
-        ]
-
     return q
 
 
@@ -690,6 +789,25 @@ def fetch_leads(filters: dict) -> list[dict]:
     col = leads_col()
     q = build_query(filters)
     docs = list(col.find(q).sort([("leadDate", DESCENDING)]))
+
+    search = (filters.get("search") or "").strip().lower()
+    if search:
+
+        def match(d: dict) -> bool:
+            fields = [
+                d.get("leadId"),
+                d.get("contactName"),
+                d.get("companyName"),
+                d.get("contactEmail"),
+                d.get("contactPhone"),
+                d.get("productType"),
+                safe_get(d, "allocatedTo.displayName"),
+                d.get("leadStatus"),
+            ]
+            return any(search in str(v).lower() for v in fields if v is not None)
+
+        docs = [d for d in docs if match(d)]
+
     return docs
 
 
@@ -698,8 +816,11 @@ def compute_kpis_from_docs(docs: list[dict]) -> dict:
     interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
     not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "not interested")
     closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "closed")
-    total_brokerage = sum(parse_money(d.get("brokerageReceived")) or 0 for d in docs)
-
+    total_brokerage = 0.0
+    for d in docs:
+        v = d.get("brokerageReceived")
+        if isinstance(v, (int, float)):
+            total_brokerage += float(v)
     return {
         "total": total,
         "interested": interested,
@@ -709,19 +830,19 @@ def compute_kpis_from_docs(docs: list[dict]) -> dict:
     }
 
 
-def compute_kpis_from_db(filters: dict) -> dict:
+def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     col = leads_col()
-    q = build_query(filters)
     total = col.count_documents(q)
     interested = col.count_documents({**q, "leadStatus": "interested"})
     not_interested = col.count_documents({**q, "leadStatus": "not interested"})
     closed = col.count_documents({**q, "leadStatus": "closed"})
 
-    # brokerage sum
-    docs = list(col.find(q, {"brokerageReceived": 1}))
-    total_brokerage = 0.0
-    for d in docs:
-        total_brokerage += parse_money(d.get("brokerageReceived")) or 0.0
+    pipeline = [
+        {"$match": q},
+        {"$group": {"_id": None, "sum": {"$sum": {"$cond": [{"$isNumber": "$brokerageReceived"}, "$brokerageReceived", 0]}}}},
+    ]
+    agg = list(col.aggregate(pipeline))
+    total_brokerage = float(agg[0]["sum"]) if agg else 0.0
 
     return {
         "total": total,
@@ -732,24 +853,16 @@ def compute_kpis_from_db(filters: dict) -> dict:
     }
 
 
-# -----------------------
-# CRUD
-# -----------------------
 def update_lead(_id: ObjectId, updates: dict):
     col = leads_col()
-    updates["updatedAt"] = datetime.now(timezone.utc)
+    updates["updatedAt"] = now_utc()
     col.update_one({"_id": _id}, {"$set": updates})
 
 
-def add_note(_id: ObjectId, text: str, created_by: Optional[dict] = None):
+def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
     col = leads_col()
-    note = {
-        "_id": ObjectId(),
-        "text": text,
-        "createdBy": created_by or {"userId": None, "displayName": "System", "email": None},
-        "createdAt": datetime.now(timezone.utc),
-    }
-    col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": datetime.now(timezone.utc)}})
+    note = {"text": text.strip(), "createdAt": now_utc(), "createdBy": created_by}
+    col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
 
 
 def create_lead(payload: dict) -> ObjectId:
@@ -761,41 +874,32 @@ def create_lead(payload: dict) -> ObjectId:
     serial = next_serial_for_month(lead_date_local)
     lead_id = make_lead_id(serial, lead_date_local)
 
+    initial_comment = (payload.get("comment") or "").strip() or None
+
     doc = {
         "leadId": lead_id,
         "legacyNumber": serial,
         "leadDate": lead_date_local.astimezone(timezone.utc),
-        "companyName": payload.get("companyName"),
-        "contactName": payload.get("contactName"),
-        "contactEmail": payload.get("contactEmail"),
-        "contactPhone": payload.get("contactPhone"),
-        "productType": payload.get("productType"),
+        "companyName": payload.get("companyName") or None,
+        "contactName": payload.get("contactName") or None,
+        "contactEmail": payload.get("contactEmail") or None,
+        "contactPhone": payload.get("contactPhone") or None,
+        "productType": payload.get("productType") or None,
+        "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
-        "allocatedTo": {
-            "displayName": payload.get("allocatedToDisplayName"),
-            "userId": None,
-            "email": None,
-        },
-        "brokerageReceived": payload.get("brokerageReceived"),
-        "notes": [],
-        "createdAt": datetime.now(timezone.utc),
-        "updatedAt": datetime.now(timezone.utc),
+        "brokerageReceived": payload.get("brokerageReceived", None),
+        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
+        "emailRecipients": [],
+        "messageText": None,
+        "schemaVersion": 3,
+        "createdAt": now_utc(),
+        "updatedAt": now_utc(),
     }
-
-    initial_comment = (payload.get("comment") or "").strip()
-    if initial_comment:
-        doc["notes"] = [{
-            "_id": ObjectId(),
-            "text": initial_comment,
-            "createdBy": {"userId": None, "displayName": "System", "email": None},
-            "createdAt": datetime.now(timezone.utc),
-        }]
 
     try:
         res = col.insert_one(doc)
         return res.inserted_id
     except DuplicateKeyError:
-        # Retry once with next serial
         serial = next_serial_for_month(lead_date_local)
         doc["legacyNumber"] = serial
         doc["leadId"] = make_lead_id(serial, lead_date_local)
@@ -804,71 +908,7 @@ def create_lead(payload: dict) -> ObjectId:
 
 
 # -----------------------
-# Migration utility (one-time) - KEEP, but no UI button
-# -----------------------
-def parse_legacy_number_from_lead_id(lead_id: str) -> Optional[int]:
-    """
-    Expects format like SL01JAN26
-    Returns 1 for '01', etc.
-    """
-    if not lead_id or not isinstance(lead_id, str):
-        return None
-    m = re.match(rf"^{LEAD_ID_PREFIX}(\d{{2}})[A-Z]{{3}}\d{{2}}$", lead_id.strip().upper())
-    if not m:
-        return None
-    try:
-        return int(m.group(1))
-    except Exception:
-        return None
-
-
-def migrate_set_legacy_numbers(batch_size: int = 500) -> tuple[int, int, int]:
-    """
-    Backfill legacyNumber for docs where missing/null using leadId pattern.
-    Returns: (matched, modified, failed)
-    """
-    col = leads_col()
-    q = {
-        "$or": [
-            {"legacyNumber": {"$exists": False}},
-            {"legacyNumber": None},
-        ]
-    }
-
-    matched = col.count_documents(q)
-    cursor = col.find(q, {"_id": 1, "leadId": 1})
-
-    ops: list[UpdateOne] = []
-    modified = 0
-    failed = 0
-
-    for d in cursor:
-        lid = d.get("leadId")
-        num = parse_legacy_number_from_lead_id(lid)
-        if num is None:
-            failed += 1
-            continue
-        ops.append(UpdateOne({"_id": d["_id"]}, {"$set": {"legacyNumber": num}}))
-        if len(ops) >= batch_size:
-            try:
-                res = col.bulk_write(ops, ordered=False)
-                modified += int(res.modified_count)
-            except BulkWriteError:
-                failed += len(ops)
-            ops = []
-
-    if ops:
-        try:
-            res = col.bulk_write(ops, ordered=False)
-            modified += int(res.modified_count)
-        except BulkWriteError:
-            failed += len(ops)
-
-    return matched, modified, failed
-
-
-# -----------------------
-# DB status
+# Auto-run DB init + status
 # -----------------------
 db_ok, db_detail = check_db_and_init()
 
@@ -967,6 +1007,7 @@ if page == "Leads":
                 "Email": d.get("contactEmail") or "—",
                 "Allocated To": safe_get(d, "allocatedTo.displayName") or "—",
                 "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
+                "Brokerage Received": format_inr_compact(parse_money(d.get("brokerageReceived")) or 0),
             }
             for idx, d in enumerate(leads)
         ])
@@ -976,6 +1017,17 @@ if page == "Leads":
             use_container_width=True,
             hide_index=True,
             height=390,
+            column_config={
+                "Number": st.column_config.NumberColumn("Number", width="small"),
+                "Lead ID": st.column_config.TextColumn("Lead ID", width="small"),
+                "Name": st.column_config.TextColumn("Name", width="medium"),
+                "Company": st.column_config.TextColumn("Company", width="medium"),
+                "Phone": st.column_config.TextColumn("Phone", width="small"),
+                "Email": st.column_config.TextColumn("Email", width="large"),
+                "Allocated To": st.column_config.TextColumn("Allocated To", width="medium"),
+                "Status": st.column_config.TextColumn("Status", width="small"),
+                "Brokerage Received": st.column_config.TextColumn("Brokerage Received", width="medium"),
+            },
             on_select="rerun",
             selection_mode="single-row",
             key="filtered_leads_table",
