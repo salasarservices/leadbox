@@ -399,14 +399,14 @@ div[data-testid="stElementToolbar"] button:hover {
 
 div[role="tooltip"] {
   background: linear-gradient(135deg, #2d448d 0%, #00aeef 100%) !important;
-  color: #ffffff !important;
+  color: #0d4880 !important;
   border: 1px solid rgba(255, 255, 255, 0.28) !important;
   border-radius: 10px !important;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24) !important;
 }
 
 div[role="tooltip"] * {
-  color: #ffffff !important;
+  color: #0d4880 !important;
 }
 
 </style>
