@@ -631,7 +631,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
         <div class="kpi-sub">Interested</div>
       </div>
     </div>
-    <div class="kpi-title-below">Interested</div>
+    <div class="kpi-title-below"></div>
   </div>
 
   <div class="kpi-wrap">
@@ -641,7 +641,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
         <div class="kpi-sub">Not Interested</div>
       </div>
     </div>
-    <div class="kpi-title-below">Not Interested</div>
+    <div class="kpi-title-below"></div>
   </div>
 
   <div class="kpi-wrap">
@@ -651,7 +651,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
         <div class="kpi-sub">Closed</div>
       </div>
     </div>
-    <div class="kpi-title-below">Closed</div>
+    <div class="kpi-title-below"></div>
   </div>
 
   <div class="kpi-wrap">
@@ -661,7 +661,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
         <div class="kpi-sub">Total Brokerage</div>
       </div>
     </div>
-    <div class="kpi-title-below">Total Brokerage</div>
+    <div class="kpi-title-below"></div>
   </div>
 </div>
 """
