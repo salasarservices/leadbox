@@ -380,7 +380,7 @@ footer { visibility: hidden; }
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  font-weight: 800;
+  font-weight: 900;
 }
 .kpi-title-below{
   margin-top: 10px;
@@ -618,7 +618,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
       <div class="kpi-inner">
         <div class="kpi-number navy">{total}</div>
-        <div class="kpi-sub">Leads</div>
+        <div class="kpi-sub">Total Leads</div>
       </div>
     </div>
     <div class="kpi-title-below">Total Leads</div>
@@ -628,7 +628,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-lime), #fff);">
       <div class="kpi-inner">
         <div class="kpi-number lime">{interested}</div>
-        <div class="kpi-sub">Leads</div>
+        <div class="kpi-sub">Interested</div>
       </div>
     </div>
     <div class="kpi-title-below">Interested</div>
@@ -638,7 +638,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
-        <div class="kpi-sub">Leads</div>
+        <div class="kpi-sub">Not Interested</div>
       </div>
     </div>
     <div class="kpi-title-below">Not Interested</div>
@@ -648,7 +648,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-cyan), #fff);">
       <div class="kpi-inner">
         <div class="kpi-number cyan">{closed}</div>
-        <div class="kpi-sub">Leads</div>
+        <div class="kpi-sub">Closed</div>
       </div>
     </div>
     <div class="kpi-title-below">Closed</div>
@@ -658,7 +658,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#9a3412;">{brok}</div>
-        <div class="kpi-sub">INR</div>
+        <div class="kpi-sub">Total Brokerage</div>
       </div>
     </div>
     <div class="kpi-title-below">Total Brokerage</div>
