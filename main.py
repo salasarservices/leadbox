@@ -621,7 +621,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
         <div class="kpi-sub">Total Leads</div>
       </div>
     </div>
-    <div class="kpi-title-below">Total Leads</div>
+    <div class="kpi-title-below"></div>
   </div>
 
   <div class="kpi-wrap">
