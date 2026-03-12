@@ -615,7 +615,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     return f"""
 <div class="kpi-row">
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
+    <div class="kpi" style="background: linear-gradient(90deg, #5b6bdc 0%, #4f8fd8 50%, #46c1d9 100%);">
       <div class="kpi-inner">
         <div class="kpi-number navy">{total}</div>
         <div class="kpi-sub">Total Leads</div>
