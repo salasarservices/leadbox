@@ -379,6 +379,36 @@ div[data-testid="stDataFrame"] [role="columnheader"] * {
   justify-content: center !important;
 }
 
+/* Make dataframe toolbar and tooltips more prominent */
+div[data-testid="stElementToolbar"] {
+  background: linear-gradient(135deg, rgba(45, 68, 141, 0.16), rgba(0, 174, 239, 0.14)) !important;
+  border: 1px solid rgba(45, 68, 141, 0.22) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 20px rgba(45, 68, 141, 0.18) !important;
+  padding: 4px 6px !important;
+}
+
+div[data-testid="stElementToolbar"] button {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-radius: 9px !important;
+}
+
+div[data-testid="stElementToolbar"] button:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+}
+
+div[role="tooltip"] {
+  background: linear-gradient(135deg, #2d448d 0%, #00aeef 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24) !important;
+}
+
+div[role="tooltip"] * {
+  color: #ffffff !important;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
