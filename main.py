@@ -4,8 +4,11 @@ from datetime import datetime, timezone, date as date_type
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 import hmac
+import hashlib
 import os
 import re
+import secrets
+import string
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,27 +32,28 @@ MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", 
 
 DB_NAME = "sal-leads"
 COLL_LEADS = "leads"
+COLL_USERS = "leadbox-users"
 SECRET_KEY_LEADS = "mongo_uri_leads"  # Streamlit secrets key
 LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedAt=1771587668127"
 
 LEAD_ID_PREFIX = "SL"
+SUPER_ADMIN_USERNAME = "sallead"
 
 
 # -----------------------
 # LOGIN (simple gate)
 # -----------------------
 def _get_login_creds() -> tuple[str, str]:
-    user = st.secrets.get("app_user") or os.environ.get("APP_USER") or ""
+    user = st.secrets.get("app_user") or os.environ.get("APP_USER") or SUPER_ADMIN_USERNAME
     pwd = st.secrets.get("app_password") or os.environ.get("APP_PASSWORD") or ""
 
-    user = str(user).strip()
+    user = str(user).strip() or SUPER_ADMIN_USERNAME
     pwd = str(pwd)
 
-    if not user or not pwd:
+    if not pwd:
         st.error("Login is not configured.")
         st.info(
             "Streamlit Cloud → App → Settings → Secrets. Add:\n\n"
-            'app_user = "your-username"\n'
             'app_password = "your-password"\n'
         )
         st.stop()
@@ -60,8 +64,51 @@ def _get_login_creds() -> tuple[str, str]:
 APP_USER, APP_PASSWORD = _get_login_creds()
 
 
-def check_login(username: str, password: str) -> bool:
-    return hmac.compare_digest(username or "", APP_USER) and hmac.compare_digest(password or "", APP_PASSWORD)
+
+
+def check_legacy_login(username: str, password: str) -> bool:
+    return hmac.compare_digest((username or "").strip(), APP_USER) and hmac.compare_digest(password or "", APP_PASSWORD)
+
+def check_super_admin(username: str, password: str) -> bool:
+    user = (username or "").strip()
+    if not user:
+        return False
+    user_match = hmac.compare_digest(user.lower(), SUPER_ADMIN_USERNAME)
+    pwd_match = hmac.compare_digest(password or "", APP_PASSWORD)
+    return user_match and pwd_match
+
+
+def users_col_for_login() -> Optional[Any]:
+    uri = st.secrets.get(SECRET_KEY_LEADS)
+    if not uri:
+        return None
+    try:
+        client = MongoClient(uri, serverSelectionTimeoutMS=1800)
+        return client[DB_NAME][COLL_USERS]
+    except Exception:
+        return None
+
+
+def hash_password(password: str) -> str:
+    return hashlib.sha256((password or "").encode("utf-8")).hexdigest()
+
+
+def check_db_user_login(username: str, password: str) -> bool:
+    uname = (username or "").strip().lower()
+    pwd = password or ""
+    if not uname or not pwd:
+        return False
+
+    col = users_col_for_login()
+    if col is None:
+        return False
+
+    doc = col.find_one({"username": uname, "isActive": {"$ne": False}}, {"passwordHash": 1})
+    if not doc:
+        return False
+
+    stored = str(doc.get("passwordHash") or "")
+    return bool(stored) and hmac.compare_digest(stored, hash_password(pwd))
 
 
 def login_gate() -> None:
@@ -89,8 +136,21 @@ def login_gate() -> None:
         ok = st.form_submit_button("Login")
 
     if ok:
-        if check_login(u.strip(), p):
+        username = u.strip()
+        if check_super_admin(username, p):
             st.session_state["authenticated"] = True
+            st.session_state["logged_in_user"] = username.lower()
+            st.session_state["is_super_admin"] = True
+            st.rerun()
+        elif check_legacy_login(username, p):
+            st.session_state["authenticated"] = True
+            st.session_state["logged_in_user"] = username.lower()
+            st.session_state["is_super_admin"] = username.lower() == SUPER_ADMIN_USERNAME
+            st.rerun()
+        elif check_db_user_login(username, p):
+            st.session_state["authenticated"] = True
+            st.session_state["logged_in_user"] = username.lower()
+            st.session_state["is_super_admin"] = False
             st.rerun()
         else:
             st.error("Invalid username or password.")
@@ -399,14 +459,14 @@ div[data-testid="stElementToolbar"] button:hover {
 
 div[role="tooltip"] {
   background: linear-gradient(135deg, #2d448d 0%, #00aeef 100%) !important;
-  color: #0d4880 !important;
+  color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.28) !important;
   border-radius: 10px !important;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.24) !important;
 }
 
 div[role="tooltip"] * {
-  color: #0d4880 !important;
+  color: #ffffff !important;
 }
 
 </style>
@@ -600,6 +660,50 @@ def leads_col():
     return mongo_client()[DB_NAME][COLL_LEADS]
 
 
+def users_col():
+    return mongo_client()[DB_NAME][COLL_USERS]
+
+
+def generate_strong_password(length: int = 16) -> str:
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    while True:
+        pwd = "".join(secrets.choice(alphabet) for _ in range(length))
+        if (
+            any(ch.islower() for ch in pwd)
+            and any(ch.isupper() for ch in pwd)
+            and any(ch.isdigit() for ch in pwd)
+            and any(ch in "!@#$%^&*()-_=+" for ch in pwd)
+        ):
+            return pwd
+
+
+def create_dashboard_user(username: str, password: str, created_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Username is required."
+    if not re.fullmatch(r"[a-z0-9._-]{3,40}", uname):
+        return False, "Username must be 3-40 chars: lowercase letters, numbers, dot, underscore, hyphen."
+    if not password:
+        return False, "Password is required."
+
+    col = users_col()
+    doc = {
+        "username": uname,
+        "passwordHash": hash_password(password),
+        "createdAt": now_utc(),
+        "updatedAt": now_utc(),
+        "createdBy": (created_by or "").strip().lower() or None,
+        "isActive": True,
+        "role": "user",
+    }
+
+    try:
+        col.insert_one(doc)
+        return True, f"User '{uname}' created successfully."
+    except DuplicateKeyError:
+        return False, f"User '{uname}' already exists."
+
+
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -680,6 +784,11 @@ def ensure_indexes():
         col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
     if "idx_allocatedTo" not in existing:
         col.create_index([("allocatedTo.displayName", ASCENDING)], name="idx_allocatedTo")
+
+    ucol = users_col()
+    users_existing = ucol.index_information()
+    if "uniq_username" not in users_existing:
+        ucol.create_index([("username", ASCENDING)], unique=True, name="uniq_username")
 
 
 def check_db_and_init() -> tuple[bool, str]:
@@ -1015,6 +1124,26 @@ with st.sidebar:
         )
     card_close()
 
+    if st.session_state.get("is_super_admin") is True:
+        card_open("User Management", "lb-navy", "#2d448d", subtitle="Add dashboard users with generated strong passwords")
+        with st.form("create_user_form"):
+            new_username = st.text_input("New Username", placeholder="e.g. team.member")
+            generated_password = generate_strong_password(16)
+            st.text_input("Generated Strong Password", value=generated_password, disabled=True)
+            create_user_btn = st.form_submit_button("Add User")
+
+        if create_user_btn:
+            ok_user, msg_user = create_dashboard_user(
+                username=new_username,
+                password=generated_password,
+                created_by=st.session_state.get("logged_in_user"),
+            )
+            if ok_user:
+                st.success(f"{msg_user} Share this password securely: {generated_password}")
+            else:
+                st.error(msg_user)
+        card_close()
+
 filters = {
     "status": status,
     "allocatedTo": allocatedTo,
@@ -1056,6 +1185,37 @@ if page == "Leads":
             }
             for idx, d in enumerate(leads)
         ])
+
+        df_download = pd.DataFrame([
+            {
+                "Number": idx + 1,
+                "Lead ID": d.get("leadId") or "",
+                "Name": d.get("contactName") or "",
+                "Company": d.get("companyName") or "",
+                "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
+                "Status": denormalize_lead_status(d.get("leadStatus")) or "",
+                "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
+                "Phone Number": d.get("contactPhone") or "",
+                "Email": d.get("contactEmail") or "",
+                "Comments": " | ".join(
+                    [
+                        str((n or {}).get("text") or "").strip()
+                        for n in (d.get("notes") or [])
+                        if isinstance(n, dict) and str((n or {}).get("text") or "").strip()
+                    ]
+                ),
+            }
+            for idx, d in enumerate(leads)
+        ])
+
+        st.download_button(
+            "Download Filtered Leads CSV",
+            data=df_download.to_csv(index=False).encode("utf-8"),
+            file_name=f"filtered_leads_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            key="download_filtered_leads_csv",
+        )
 
         selection_event = st.dataframe(
             df_table,
