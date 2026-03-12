@@ -38,6 +38,7 @@ LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedA
 
 LEAD_ID_PREFIX = "SL"
 SUPER_ADMIN_USERNAME = "sallead"
+INACTIVITY_TIMEOUT_SECONDS = 30 * 60
 
 
 # -----------------------
@@ -111,8 +112,31 @@ def check_db_user_login(username: str, password: str) -> bool:
     return bool(stored) and hmac.compare_digest(stored, hash_password(pwd))
 
 
+def logout_user(reason: str = "You have been logged out.") -> None:
+    st.session_state.clear()
+    st.session_state["logout_notice"] = reason
+    st.rerun()
+
+
+def track_session_activity() -> None:
+    if st.session_state.get("authenticated") is not True:
+        return
+
+    now_ts = datetime.now(timezone.utc).timestamp()
+    last_ts = float(st.session_state.get("last_activity_ts") or now_ts)
+    if now_ts - last_ts >= INACTIVITY_TIMEOUT_SECONDS:
+        logout_user("Logged out due to 30 minutes of inactivity.")
+
+    st.session_state["last_activity_ts"] = now_ts
+
+
 def login_gate() -> None:
+    notice = st.session_state.pop("logout_notice", None)
+    if notice:
+        st.warning(notice)
+
     if st.session_state.get("authenticated") is True:
+        track_session_activity()
         return
 
     st.markdown(
@@ -141,16 +165,19 @@ def login_gate() -> None:
             st.session_state["authenticated"] = True
             st.session_state["logged_in_user"] = username.lower()
             st.session_state["is_super_admin"] = True
+            st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
             st.rerun()
         elif check_legacy_login(username, p):
             st.session_state["authenticated"] = True
             st.session_state["logged_in_user"] = username.lower()
             st.session_state["is_super_admin"] = username.lower() == SUPER_ADMIN_USERNAME
+            st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
             st.rerun()
         elif check_db_user_login(username, p):
             st.session_state["authenticated"] = True
             st.session_state["logged_in_user"] = username.lower()
             st.session_state["is_super_admin"] = False
+            st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
             st.rerun()
         else:
             st.error("Invalid username or password.")
@@ -690,6 +717,7 @@ def create_dashboard_user(username: str, password: str, created_by: str | None =
     doc = {
         "username": uname,
         "passwordHash": hash_password(password),
+        "passwordPlain": password,
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
         "createdBy": (created_by or "").strip().lower() or None,
@@ -702,6 +730,45 @@ def create_dashboard_user(username: str, password: str, created_by: str | None =
         return True, f"User '{uname}' created successfully."
     except DuplicateKeyError:
         return False, f"User '{uname}' already exists."
+
+
+def list_dashboard_users() -> List[dict]:
+    col = users_col()
+    return list(
+        col.find(
+            {},
+            {
+                "username": 1,
+                "passwordPlain": 1,
+                "isActive": 1,
+                "createdAt": 1,
+                "updatedAt": 1,
+            },
+        ).sort([("username", ASCENDING)])
+    )
+
+
+def set_dashboard_user_password(username: str, password: str, updated_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Select a valid user."
+    if not password:
+        return False, "Password is required."
+
+    res = users_col().update_one(
+        {"username": uname},
+        {
+            "$set": {
+                "passwordHash": hash_password(password),
+                "passwordPlain": password,
+                "updatedAt": now_utc(),
+                "updatedBy": (updated_by or "").strip().lower() or None,
+            }
+        },
+    )
+    if res.matched_count == 0:
+        return False, f"User '{uname}' not found."
+    return True, f"Password updated for '{uname}'."
 
 
 def now_utc() -> datetime:
@@ -1089,6 +1156,11 @@ st.write("")
 with st.sidebar:
     db_status_pill(db_ok, db_detail)
 
+    logged_in_user = st.session_state.get("logged_in_user") or "unknown"
+    st.caption(f"Signed in as: `{logged_in_user}`")
+    if st.button("Logout", use_container_width=True):
+        logout_user("You have been logged out.")
+
     if st.button("Refresh DB", use_container_width=True):
         clear_db_cache()
         st.success("DB cache cleared. Data will refresh on next interaction.")
@@ -1125,23 +1197,84 @@ with st.sidebar:
     card_close()
 
     if st.session_state.get("is_super_admin") is True:
-        card_open("User Management", "lb-navy", "#2d448d", subtitle="Add dashboard users with generated strong passwords")
+        card_open("User Management", "lb-navy", "#2d448d", subtitle="Add users, manage passwords, and reveal current user credentials")
+
+        if "generated_password_create" not in st.session_state:
+            st.session_state["generated_password_create"] = generate_strong_password(16)
+
         with st.form("create_user_form"):
             new_username = st.text_input("New Username", placeholder="e.g. team.member")
-            generated_password = generate_strong_password(16)
-            st.text_input("Generated Strong Password", value=generated_password, disabled=True)
-            create_user_btn = st.form_submit_button("Add User")
+            generated_password = st.session_state.get("generated_password_create") or generate_strong_password(16)
+            selected_password = st.text_input(
+                "Generated Strong Password",
+                value=generated_password,
+                help="Editable for super-admin: keep generated value or enter your own password.",
+            )
+            create_cols = st.columns(2)
+            with create_cols[0]:
+                refresh_generated = st.form_submit_button("Regenerate Password")
+            with create_cols[1]:
+                create_user_btn = st.form_submit_button("Add User")
+
+        if refresh_generated:
+            st.session_state["generated_password_create"] = generate_strong_password(16)
+            st.rerun()
 
         if create_user_btn:
             ok_user, msg_user = create_dashboard_user(
                 username=new_username,
-                password=generated_password,
+                password=selected_password,
                 created_by=st.session_state.get("logged_in_user"),
             )
             if ok_user:
-                st.success(f"{msg_user} Share this password securely: {generated_password}")
+                st.success(f"{msg_user} Current password: {selected_password}")
+                st.session_state["generated_password_create"] = generate_strong_password(16)
             else:
                 st.error(msg_user)
+
+        users = list_dashboard_users()
+        usernames = [u.get("username") for u in users if u.get("username")]
+        with st.form("change_user_password_form"):
+            st.markdown("**Change Existing User Password**")
+            selected_user = st.selectbox("Select User", options=usernames) if usernames else None
+            generated_update_password = generate_strong_password(16)
+            updated_password = st.text_input(
+                "New Password (Editable Generated Password)",
+                value=generated_update_password,
+                help="Use generated password or enter your preferred password.",
+            )
+            update_password_btn = st.form_submit_button("Update Password")
+
+        if update_password_btn:
+            if not selected_user:
+                st.error("No users available to update.")
+            else:
+                ok_upd, msg_upd = set_dashboard_user_password(
+                    username=selected_user,
+                    password=updated_password,
+                    updated_by=st.session_state.get("logged_in_user"),
+                )
+                if ok_upd:
+                    st.success(msg_upd)
+                else:
+                    st.error(msg_upd)
+
+        with st.expander("Click to reveal current users and passwords"):
+            users = list_dashboard_users()
+            if not users:
+                st.info("No users found.")
+            else:
+                reveal_rows = []
+                for user_doc in users:
+                    reveal_rows.append(
+                        {
+                            "Username": user_doc.get("username") or "—",
+                            "Current Password": user_doc.get("passwordPlain") or "(legacy/unknown)",
+                            "Active": "Yes" if user_doc.get("isActive", True) else "No",
+                        }
+                    )
+                st.dataframe(pd.DataFrame(reveal_rows), use_container_width=True, hide_index=True)
+
         card_close()
 
 filters = {
