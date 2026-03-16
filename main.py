@@ -218,7 +218,7 @@ DEFAULT_PRODUCT_TYPES: list[str] = [
     "Super Top-Up policy",
     "Personal Accident Policy",
     "Cancer Insurance",
-        "Critical Illness Policy",
+    "Critical Illness Policy",
     "Health Insurance Policy Audit (HIPA)",
     "Term Life Insurance",
     "Whole Life Insurance",
@@ -438,7 +438,7 @@ footer { visibility: hidden; }
 }
 .lb-comment-meta{
   color: #4d7c0f;
-    font-size: 0.80rem;
+  font-size: 0.80rem;
   font-weight: 800;
   margin-bottom: 4px;
   text-transform: uppercase;
@@ -600,8 +600,9 @@ def comments_view_html(notes: list[dict]) -> str:
     for i, note in enumerate(notes):
         text = str((note or {}).get("text") or "").strip() or "(empty comment)"
         ts = format_note_datetime_ist((note or {}).get("createdAt"))
+        author = str((note or {}).get("createdBy") or "Unknown user").strip() or "Unknown user"
         rows.append('<div class="lb-comment-item">')
-        rows.append(f'<div class="lb-comment-meta">{ts}</div>')
+        rows.append(f'<div class="lb-comment-meta">{author} • {ts}</div>')
         rows.append(f'<div class="lb-comment-text">{text}</div>')
         rows.append('</div>')
         if i < len(notes) - 1:
@@ -658,7 +659,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#9a3412;">{brok}</div>
-            <div class="kpi-sub">Total Brokerage</div>
+        <div class="kpi-sub">Total Brokerage</div>
       </div>
     </div>
     <div class="kpi-title-below"></div>
@@ -1098,7 +1099,7 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
 
     selection_event = st.dataframe(
         df_table,
-                use_container_width=True,
+        use_container_width=True,
         hide_index=True,
         height=390,
         column_config={
@@ -1199,7 +1200,7 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
-        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": None}] if initial_comment else []),
+        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": st.session_state.get("logged_in_user")}] if initial_comment else []),
         "emailRecipients": [],
         "messageText": None,
         "schemaVersion": 3,
@@ -1318,7 +1319,7 @@ with st.sidebar:
                 st.success(f"{msg_user} Current password: {selected_password}")
                 st.session_state["generated_password_create"] = generate_strong_password(16)
             else:
-                                st.error(msg_user)
+                st.error(msg_user)
 
         users = list_dashboard_users()
         usernames = [u.get("username") for u in users if u.get("username")]
@@ -1387,28 +1388,8 @@ if page == "Leads":
         unsafe_allow_html=True,
     )
 
-    all_leads_filters = {
-        "status": "all",
-        "allocatedTo": "all",
-        "search": "",
-        "month_mode": "all",
-        "month_year": filters.get("month_year"),
-        "month_num": filters.get("month_num"),
-    }
-    all_leads = fetch_leads(all_leads_filters)
-
-    card_open("All Leads", "lb-lime", "#a6ce39", subtitle="Click below to expand and view all leads")
-    with st.expander("All Leads Table", expanded=False):
-        render_leads_table(
-            all_leads,
-            table_key="all_leads_table",
-            download_key="all_leads",
-            download_label="Download All Leads CSV",
-        )
-    card_close()
-
     table_title = "Filtered Leads" if is_filtered else "Leads"
-    table_subtitle = "Matching leads" if is_filtered else "Showing all leads (All filters selected)"
+    table_subtitle = "Matching leads" if is_filtered else "Showing all leads"
     download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
     download_key = "filtered_leads" if is_filtered else "leads"
 
@@ -1538,7 +1519,7 @@ if page == "Leads":
                     0,
                     0,
                     0,
-                                    tzinfo=IST,
+                    tzinfo=IST,
                 )
 
                 current_lead_id = lead.get("leadId")
@@ -1567,7 +1548,7 @@ if page == "Leads":
                     st.stop()
 
                 if (comment_edit or "").strip():
-                    add_note(lead_oid, comment_edit.strip(), created_by=None)
+                    add_note(lead_oid, comment_edit.strip(), created_by=st.session_state.get("logged_in_user"))
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
