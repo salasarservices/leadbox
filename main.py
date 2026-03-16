@@ -191,7 +191,7 @@ login_gate()
 # -----------------------
 # Domain choices
 # -----------------------
-LEAD_STATUS_OPTIONS = ["Fresh", "Allocated", "Interested", "Not-Interested", "Closed"]
+LEAD_STATUS_OPTIONS = ["Fresh", "Allocated", "Interested", "Lost", "Closed"]
 
 DEFAULT_PRODUCT_TYPES: list[str] = [
     "Property",
@@ -239,14 +239,16 @@ DEFAULT_PRODUCT_TYPES: list[str] = [
 def normalize_lead_status(label: str) -> str:
     s = (label or "").strip().lower()
     if s in {"not-interested", "not interested", "not_interested"}:
-        return "not interested"
+        return "lost"
+    if s == "lost":
+        return "lost"
     return s
 
 
 def denormalize_lead_status(value: Optional[str]) -> str:
     v = (value or "").strip().lower()
-    if v == "not interested":
-        return "Not-Interested"
+    if v in {"not interested", "lost"}:
+        return "Lost"
     if not v:
         return "Fresh"
     return v.title()
@@ -611,6 +613,35 @@ def comments_view_html(notes: list[dict]) -> str:
     return "".join(rows)
 
 
+def allocation_chain(lead: dict) -> list[str]:
+    history = [h for h in (lead.get("allocationHistory") or []) if isinstance(h, dict)]
+    ordered = sorted(
+        history,
+        key=lambda h: h.get("editedAt") if isinstance(h.get("editedAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc),
+    )
+
+    chain: list[str] = []
+    for item in ordered:
+        first_alloc = str(item.get("from") or "").strip()
+        reassigned_to = str(item.get("to") or "").strip()
+        if first_alloc and (not chain or chain[-1].lower() != first_alloc.lower()):
+            chain.append(first_alloc)
+        if reassigned_to and (not chain or chain[-1].lower() != reassigned_to.lower()):
+            chain.append(reassigned_to)
+
+    if not chain:
+        current = str(safe_get(lead, "allocatedTo.displayName") or "").strip()
+        if current:
+            chain.append(current)
+
+    return chain
+
+
+def allocation_chain_text(lead: dict) -> str:
+    chain = allocation_chain(lead)
+    return " -> ".join(chain) if chain else "—"
+
+
 def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     return f"""
@@ -639,7 +670,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
-        <div class="kpi-sub">Not Interested</div>
+        <div class="kpi-sub">Lost</div>
       </div>
     </div>
     <div class="kpi-title-below"></div>
@@ -715,6 +746,7 @@ def create_dashboard_user(username: str, password: str, created_by: str | None =
         return False, "Password is required."
 
     col = users_col()
+
     doc = {
         "username": uname,
         "passwordHash": hash_password(password),
@@ -859,10 +891,16 @@ def ensure_indexes():
         ucol.create_index([("username", ASCENDING)], unique=True, name="uniq_username")
 
 
+def migrate_status_terms() -> None:
+    col = leads_col()
+    col.update_many({"leadStatus": {"$in": ["not interested", "not-interested", "not_interested"]}}, {"$set": {"leadStatus": "lost", "updatedAt": now_utc()}})
+
+
 def check_db_and_init() -> tuple[bool, str]:
     try:
         mongo_client().admin.command("ping")
         ensure_indexes()
+        migrate_status_terms()
         return True, "Connected • indexes OK"
     except Exception as e:
         return False, str(e)
@@ -1051,7 +1089,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
             "Lead ID": d.get("leadId") or "—",
             "Name": d.get("contactName") or "—",
             "Company": d.get("companyName") or "—",
-            "Allocated To": safe_get(d, "allocatedTo.displayName") or "—",
+            "Allocated To": allocation_chain_text(d),
             "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
             "Brokerage Received": format_inr_compact(parse_money(d.get("brokerageReceived")) or 0),
         }
@@ -1064,7 +1102,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
             "Lead ID": d.get("leadId") or "",
             "Name": d.get("contactName") or "",
             "Company": d.get("companyName") or "",
-            "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
+            "Allocated To": allocation_chain_text(d).replace("—", ""),
             "Status": denormalize_lead_status(d.get("leadStatus")) or "",
             "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
             "Phone Number": d.get("contactPhone") or "",
@@ -1126,7 +1164,7 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
 def compute_kpis_from_docs(docs: list[dict]) -> dict:
     total = len(docs)
     interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
-    not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "not interested")
+    not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() in {"not interested", "lost"})
     closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "closed")
     total_brokerage = 0.0
     for d in docs:
@@ -1146,7 +1184,7 @@ def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     col = leads_col()
     total = col.count_documents(q)
     interested = col.count_documents({**q, "leadStatus": "interested"})
-    not_interested = col.count_documents({**q, "leadStatus": "not interested"})
+    not_interested = col.count_documents({**q, "leadStatus": {"$in": ["lost", "not interested"]}})
     closed = col.count_documents({**q, "leadStatus": "closed"})
 
     pipeline = [
@@ -1165,10 +1203,13 @@ def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     }
 
 
-def update_lead(_id: ObjectId, updates: dict):
+def update_lead(_id: ObjectId, updates: dict, push_ops: Optional[dict] = None):
     col = leads_col()
     updates["updatedAt"] = now_utc()
-    col.update_one({"_id": _id}, {"$set": updates})
+    update_doc: dict = {"$set": updates}
+    if push_ops:
+        update_doc["$push"] = push_ops
+    col.update_one({"_id": _id}, update_doc)
 
 
 def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
@@ -1187,6 +1228,8 @@ def create_lead(payload: dict) -> ObjectId:
     lead_id = make_lead_id(serial, lead_date_local)
 
     initial_comment = (payload.get("comment") or "").strip() or None
+    allocation_name = (payload.get("allocatedToDisplayName") or "").strip() or None
+    created_by = st.session_state.get("logged_in_user")
 
     doc = {
         "leadId": lead_id,
@@ -1197,10 +1240,11 @@ def create_lead(payload: dict) -> ObjectId:
         "contactEmail": payload.get("contactEmail") or None,
         "contactPhone": payload.get("contactPhone") or None,
         "productType": payload.get("productType") or None,
-        "allocatedTo": {"displayName": payload.get("allocatedToDisplayName") or None, "userId": None, "email": None},
+        "allocatedTo": {"displayName": allocation_name, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
-        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": st.session_state.get("logged_in_user")}] if initial_comment else []),
+        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": created_by}] if initial_comment else []),
+        "allocationHistory": ([{"from": allocation_name, "to": None, "editedAt": now_utc(), "editedBy": created_by}] if allocation_name else []),
         "emailRecipients": [],
         "messageText": None,
         "schemaVersion": 3,
@@ -1537,12 +1581,25 @@ if page == "Leads":
                     "brokerageReceived": brokerage_val,
                 }
 
+                previous_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip() or None
+                next_alloc = (allocatedToDisplayName or "").strip() or None
+                allocation_push = None
+                if previous_alloc and next_alloc and previous_alloc.lower() != next_alloc.lower():
+                    allocation_push = {
+                        "allocationHistory": {
+                            "from": previous_alloc,
+                            "to": next_alloc,
+                            "editedAt": now_utc(),
+                            "editedBy": st.session_state.get("logged_in_user"),
+                        }
+                    }
+
                 if new_lead_id != current_lead_id:
                     updates["leadId"] = new_lead_id
                     updates["legacyNumber"] = new_serial
 
                 try:
-                    update_lead(lead_oid, updates)
+                    update_lead(lead_oid, updates, push_ops=allocation_push)
                 except DuplicateKeyError:
                     st.error("Lead ID collision occurred. Try saving again.")
                     st.stop()
@@ -1575,6 +1632,28 @@ if page == "Leads":
                 reverse=True,
             )
             st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
+            card_close()
+
+            card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
+            history_rows = [h for h in (selected_lead.get("allocationHistory") or []) if isinstance(h, dict)]
+            history_rows = sorted(
+                history_rows,
+                key=lambda h: h.get("editedAt") if isinstance(h.get("editedAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc),
+            )
+            if history_rows:
+                view_rows: list[dict] = []
+                for h in history_rows:
+                    view_rows.append(
+                        {
+                            "First Allocation": (h.get("from") or "—") if h.get("from") else "—",
+                            "Re-Allocated To": (h.get("to") or "—") if h.get("to") else "—",
+                            "Edited By": (h.get("editedBy") or "Unknown user") if h.get("editedBy") else "Unknown user",
+                            "Date & Time": format_note_datetime_ist(h.get("editedAt")),
+                        }
+                    )
+                st.dataframe(pd.DataFrame(view_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info("No allocation history available for this lead.")
             card_close()
 
 elif page == "Create Lead":
