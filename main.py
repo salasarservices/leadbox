@@ -33,7 +33,6 @@ MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", 
 DB_NAME = "sal-leads"
 COLL_LEADS = "leads"
 COLL_USERS = "leadbox-users"
-COLL_ALLOC_HISTORY = "lead_allocation_history"
 SECRET_KEY_LEADS = "mongo_uri_leads"  # Streamlit secrets key
 LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedAt=1771587668127"
 
@@ -192,7 +191,7 @@ login_gate()
 # -----------------------
 # Domain choices
 # -----------------------
-LEAD_STATUS_OPTIONS = ["Fresh", "Allocated", "Interested", "Closed"]
+LEAD_STATUS_OPTIONS = ["Fresh", "Allocated", "Interested", "Not-Interested", "Closed"]
 
 DEFAULT_PRODUCT_TYPES: list[str] = [
     "Property",
@@ -239,17 +238,15 @@ DEFAULT_PRODUCT_TYPES: list[str] = [
 
 def normalize_lead_status(label: str) -> str:
     s = (label or "").strip().lower()
-    # Legacy: treat any variant of "not-interested" as "closed"
     if s in {"not-interested", "not interested", "not_interested"}:
-        return "closed"
+        return "not interested"
     return s
 
 
 def denormalize_lead_status(value: Optional[str]) -> str:
     v = (value or "").strip().lower()
-    # Legacy stored value — display as Closed
-    if v in {"not interested", "not-interested", "not_interested"}:
-        return "Closed"
+    if v == "not interested":
+        return "Not-Interested"
     if not v:
         return "Fresh"
     return v.title()
@@ -614,42 +611,7 @@ def comments_view_html(notes: list[dict]) -> str:
     return "".join(rows)
 
 
-def allocation_history_html(history: list[dict]) -> str:
-    if not history:
-        return '<div class="lb-comments-view"><div class="lb-comment-text">No allocation history yet.</div></div>'
-
-    rows: list[str] = ['<div class="lb-comments-view">']
-    for i, row in enumerate(history):
-        name = str(row.get("allocatedTo") or "Unknown").strip()
-        by = str(row.get("allocatedBy") or "Unknown").strip()
-        reason = str(row.get("reason") or "").strip()
-        notes_txt = str(row.get("notes") or "").strip()
-        alloc_at = format_note_datetime_ist(row.get("allocatedAt"))
-        dealloc_at = row.get("deallocatedAt")
-        is_current = dealloc_at is None
-
-        badge = '<span style="background:#22c55e;color:#fff;font-size:0.72rem;font-weight:800;border-radius:6px;padding:1px 7px;margin-left:6px;text-transform:uppercase;">Current</span>' if is_current else ""
-        until = f" → {format_note_datetime_ist(dealloc_at)}" if dealloc_at else ""
-        dot_color = "#22c55e" if is_current else "#94a3b8"
-
-        rows.append('<div class="lb-comment-item" style="display:flex;gap:10px;align-items:flex-start;">')
-        rows.append(f'<div style="margin-top:4px;width:10px;height:10px;border-radius:999px;background:{dot_color};flex:0 0 10px;"></div>')
-        rows.append('<div style="flex:1;">')
-        rows.append(f'<div class="lb-comment-meta">{name}{badge}</div>')
-        rows.append(f'<div class="lb-comment-text" style="font-size:0.84rem;color:#475569;">Assigned by: {by} · {alloc_at}{until}</div>')
-        if reason:
-            rows.append(f'<div class="lb-comment-text" style="font-size:0.82rem;color:#64748b;">Reason: {reason}</div>')
-        if notes_txt:
-            rows.append(f'<div class="lb-comment-text" style="font-size:0.82rem;color:#64748b;">Note: {notes_txt}</div>')
-        rows.append('</div></div>')
-        if i < len(history) - 1:
-            rows.append('<div class="lb-comment-divider"></div>')
-
-    rows.append('</div>')
-    return "".join(rows)
-
-
-def kpi_circles_html(total: int, interested: int, closed: int, total_brokerage: float):
+def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     return f"""
 <div class="kpi-row">
@@ -668,6 +630,16 @@ def kpi_circles_html(total: int, interested: int, closed: int, total_brokerage: 
       <div class="kpi-inner">
         <div class="kpi-number lime">{interested}</div>
         <div class="kpi-sub">Interested</div>
+      </div>
+    </div>
+    <div class="kpi-title-below"></div>
+  </div>
+
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
+      <div class="kpi-inner">
+        <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
+        <div class="kpi-sub">Not Interested</div>
       </div>
     </div>
     <div class="kpi-title-below"></div>
@@ -718,50 +690,6 @@ def leads_col():
 
 def users_col():
     return mongo_client()[DB_NAME][COLL_USERS]
-
-
-def alloc_history_col():
-    return mongo_client()[DB_NAME][COLL_ALLOC_HISTORY]
-
-
-def get_allocation_history(lead_oid: ObjectId) -> list[dict]:
-    """Return all allocation records for a lead, newest first."""
-    col = alloc_history_col()
-    docs = list(col.find({"leadId": lead_oid}).sort([("allocatedAt", DESCENDING)]))
-    return docs
-
-
-def record_allocation(
-    lead_oid: ObjectId,
-    new_name: Optional[str],
-    allocated_by: Optional[str],
-    reason: str = "",
-    notes: str = "",
-) -> None:
-    """
-    Close the current open allocation row (set deallocatedAt),
-    then insert a new open row for new_name.
-    """
-    col = alloc_history_col()
-    now = now_utc()
-
-    # Close any currently open allocation
-    col.update_many(
-        {"leadId": lead_oid, "deallocatedAt": None},
-        {"$set": {"deallocatedAt": now}},
-    )
-
-    # Only insert a new row if there's an actual assignee
-    if new_name:
-        col.insert_one({
-            "leadId": lead_oid,
-            "allocatedTo": new_name,
-            "allocatedBy": allocated_by or "unknown",
-            "allocatedAt": now,
-            "deallocatedAt": None,
-            "reason": reason or "",
-            "notes": notes or "",
-        })
 
 
 def generate_strong_password(length: int = 16) -> str:
@@ -930,28 +858,8 @@ def ensure_indexes():
     if "uniq_username" not in users_existing:
         ucol.create_index([("username", ASCENDING)], unique=True, name="uniq_username")
 
-    acol = alloc_history_col()
-    alloc_existing = acol.index_information()
-    if "idx_alloc_leadId" not in alloc_existing:
-        acol.create_index([("leadId", ASCENDING)], name="idx_alloc_leadId")
-    if "idx_alloc_open" not in alloc_existing:
-        acol.create_index([("leadId", ASCENDING), ("deallocatedAt", ASCENDING)], name="idx_alloc_open")
 
-
-def migrate_not_interested_to_closed() -> tuple[int, str]:
-    """One-time migration: retag all 'not interested' leads as 'closed' in MongoDB."""
-    try:
-        col = leads_col()
-        result = col.update_many(
-            {"leadStatus": {"$in": ["not interested", "not-interested", "not_interested"]}},
-            {"$set": {"leadStatus": "closed", "updatedAt": now_utc()}},
-        )
-        return result.modified_count, ""
-    except Exception as e:
-        return 0, str(e)
-
-
-
+def check_db_and_init() -> tuple[bool, str]:
     try:
         mongo_client().admin.command("ping")
         ensure_indexes()
@@ -1218,8 +1126,8 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
 def compute_kpis_from_docs(docs: list[dict]) -> dict:
     total = len(docs)
     interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
-    # Legacy "not interested" docs count as closed
-    closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() in {"closed", "not interested"})
+    not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "not interested")
+    closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "closed")
     total_brokerage = 0.0
     for d in docs:
         v = d.get("brokerageReceived")
@@ -1228,6 +1136,7 @@ def compute_kpis_from_docs(docs: list[dict]) -> dict:
     return {
         "total": total,
         "interested": interested,
+        "not_interested": not_interested,
         "closed": closed,
         "total_brokerage": total_brokerage,
     }
@@ -1237,8 +1146,8 @@ def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     col = leads_col()
     total = col.count_documents(q)
     interested = col.count_documents({**q, "leadStatus": "interested"})
-    # Legacy "not interested" docs count as closed
-    closed = col.count_documents({**q, "leadStatus": {"$in": ["closed", "not interested"]}})
+    not_interested = col.count_documents({**q, "leadStatus": "not interested"})
+    closed = col.count_documents({**q, "leadStatus": "closed"})
 
     pipeline = [
         {"$match": q},
@@ -1250,6 +1159,7 @@ def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
     return {
         "total": total,
         "interested": interested,
+        "not_interested": not_interested,
         "closed": closed,
         "total_brokerage": total_brokerage,
     }
@@ -1300,27 +1210,12 @@ def create_lead(payload: dict) -> ObjectId:
 
     try:
         res = col.insert_one(doc)
-        # Record initial allocation history if assigned
-        if payload.get("allocatedToDisplayName"):
-            record_allocation(
-                res.inserted_id,
-                payload.get("allocatedToDisplayName"),
-                allocated_by=st.session_state.get("logged_in_user"),
-                reason="Initial Assignment",
-            )
         return res.inserted_id
     except DuplicateKeyError:
         serial = next_serial_for_month(lead_date_local)
         doc["legacyNumber"] = serial
         doc["leadId"] = make_lead_id(serial, lead_date_local)
         res = col.insert_one(doc)
-        if payload.get("allocatedToDisplayName"):
-            record_allocation(
-                res.inserted_id,
-                payload.get("allocatedToDisplayName"),
-                allocated_by=st.session_state.get("logged_in_user"),
-                reason="Initial Assignment",
-            )
         return res.inserted_id
 
 
@@ -1453,18 +1348,6 @@ with st.sidebar:
                 else:
                     st.error(msg_upd)
 
-        st.markdown("---")
-        st.markdown("**🔄 Data Migration**")
-        st.caption("Retag all legacy 'Not-Interested' leads as 'Closed' in the database.")
-        if st.button("Run Migration: Not-Interested → Closed", use_container_width=True):
-            count, err = migrate_not_interested_to_closed()
-            if err:
-                st.error(f"Migration failed: {err}")
-            elif count == 0:
-                st.info("No 'Not-Interested' leads found — nothing to migrate.")
-            else:
-                st.success(f"✅ Migrated {count} lead(s) from 'Not-Interested' → 'Closed'.")
-
         with st.expander("Click to reveal current users and passwords"):
             users = list_dashboard_users()
             if not users:
@@ -1501,7 +1384,7 @@ if page == "Leads":
 
     kpis = compute_kpis_from_docs(leads)
     st.markdown(
-        kpi_circles_html(kpis["total"], kpis["interested"], kpis["closed"], kpis["total_brokerage"]),
+        kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
         unsafe_allow_html=True,
     )
 
@@ -1585,9 +1468,9 @@ if page == "Leads":
                     alloc_opts = allocated_to_suggestions()
                     current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
 
-                    alloc_options = ["None"] + alloc_opts
+                    alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
                     if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-                        alloc_options.insert(1, current_alloc)
+                        alloc_options.insert(2, current_alloc)
 
                     alloc_index = 0
                     if current_alloc:
@@ -1597,20 +1480,8 @@ if page == "Leads":
                             alloc_index = 0
 
                     allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-                    allocatedToDisplayName = (allocPick if allocPick != "None" else "").strip() or None
-
-                    # Show reassignment warning + reason only when owner actually changes
-                    reassign_reason = ""
-                    reassign_notes = ""
-                    is_reassignment = allocatedToDisplayName != (current_alloc or None)
-                    if is_reassignment and current_alloc:
-                        st.warning(f"⚠️ Reassigning from **{current_alloc}** → **{allocatedToDisplayName or 'None'}**")
-                        reassign_reason = st.selectbox(
-                            "Reason for reassignment",
-                            ["Reassigned", "Escalated", "Out of Office", "Performance", "Other"],
-                            key="reassign_reason_edit",
-                        )
-                        reassign_notes = st.text_input("Notes (optional)", key="reassign_notes_edit")
+                    allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+                    allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
 
                 brokerage = st.text_input(
                     "Brokerage received",
@@ -1676,16 +1547,6 @@ if page == "Leads":
                     st.error("Lead ID collision occurred. Try saving again.")
                     st.stop()
 
-                # Record allocation history if owner changed
-                if allocatedToDisplayName != (current_alloc or None):
-                    record_allocation(
-                        lead_oid,
-                        allocatedToDisplayName,
-                        allocated_by=st.session_state.get("logged_in_user"),
-                        reason=reassign_reason if current_alloc else "Initial Assignment",
-                        notes=reassign_notes,
-                    )
-
                 if (comment_edit or "").strip():
                     add_note(lead_oid, comment_edit.strip(), created_by=st.session_state.get("logged_in_user"))
 
@@ -1716,11 +1577,6 @@ if page == "Leads":
             st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
             card_close()
 
-            card_open("Allocation History", "lb-navy", "#2d448d", subtitle="Full reassignment trail for this lead")
-            alloc_history = get_allocation_history(selected_lead["_id"])
-            st.markdown(allocation_history_html(alloc_history), unsafe_allow_html=True)
-            card_close()
-
 elif page == "Create Lead":
     card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
     product_opts = product_suggestions()
@@ -1739,14 +1595,15 @@ elif page == "Create Lead":
         with c2:
             productType = st.selectbox("Product type", ["(none)"] + product_opts)
             leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
-            allocPick = st.selectbox("Allocated to (choose)", ["None"] + alloc_opts)
+            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
+            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
 
         comment = st.text_area("Comments (optional)", height=90, placeholder="Initial note for this lead...")
         submitted = st.form_submit_button("Create Lead")
 
     if submitted:
-        alloc_display = (allocPick if allocPick != "None" else "").strip() or None
+        alloc_display = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
         brokerage_val: Any = brokerage.strip()
         if brokerage_val == "":
             brokerage_val = None
