@@ -218,7 +218,7 @@ DEFAULT_PRODUCT_TYPES: list[str] = [
     "Super Top-Up policy",
     "Personal Accident Policy",
     "Cancer Insurance",
-    "Critical Illness Policy",
+        "Critical Illness Policy",
     "Health Insurance Policy Audit (HIPA)",
     "Term Life Insurance",
     "Whole Life Insurance",
@@ -438,7 +438,7 @@ footer { visibility: hidden; }
 }
 .lb-comment-meta{
   color: #4d7c0f;
-  font-size: 0.80rem;
+    font-size: 0.80rem;
   font-weight: 800;
   margin-bottom: 4px;
   text-transform: uppercase;
@@ -658,7 +658,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
       <div class="kpi-inner">
         <div class="kpi-number" style="color:#9a3412;">{brok}</div>
-        <div class="kpi-sub">Total Brokerage</div>
+            <div class="kpi-sub">Total Brokerage</div>
       </div>
     </div>
     <div class="kpi-title-below"></div>
@@ -878,7 +878,7 @@ def product_suggestions() -> list[str]:
 
     merged: list[str] = []
     seen: set[str] = set()
-    for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
+        for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
         key = item.strip().lower()
         if key and key not in seen:
             seen.add(key)
@@ -1032,6 +1032,94 @@ def fetch_leads(filters: dict) -> list[dict]:
         docs = [d for d in docs if match(d)]
 
     return docs
+
+
+def filters_are_active(filters: dict) -> bool:
+    return (
+        filters.get("status") != "all"
+        or filters.get("allocatedTo") != "all"
+        or filters.get("month_mode") == "month"
+        or bool((filters.get("search") or "").strip())
+    )
+
+
+def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df_table = pd.DataFrame([
+        {
+            "Number": idx + 1,
+            "Lead ID": d.get("leadId") or "—",
+            "Name": d.get("contactName") or "—",
+            "Company": d.get("companyName") or "—",
+            "Allocated To": safe_get(d, "allocatedTo.displayName") or "—",
+            "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
+            "Brokerage Received": format_inr_compact(parse_money(d.get("brokerageReceived")) or 0),
+        }
+        for idx, d in enumerate(leads)
+    ])
+
+    df_download = pd.DataFrame([
+        {
+            "Number": idx + 1,
+            "Lead ID": d.get("leadId") or "",
+            "Name": d.get("contactName") or "",
+            "Company": d.get("companyName") or "",
+            "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
+            "Status": denormalize_lead_status(d.get("leadStatus")) or "",
+            "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
+            "Phone Number": d.get("contactPhone") or "",
+            "Email": d.get("contactEmail") or "",
+            "Comments": " | ".join(
+                [
+                    str((n or {}).get("text") or "").strip()
+                    for n in (d.get("notes") or [])
+                    if isinstance(n, dict) and str((n or {}).get("text") or "").strip()
+                ]
+            ),
+        }
+        for idx, d in enumerate(leads)
+    ])
+    return df_table, df_download
+
+
+def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, download_label: str) -> None:
+    if not leads:
+        st.info("No leads found.")
+        return
+
+    df_table, df_download = build_leads_table_frames(leads)
+    st.download_button(
+        download_label,
+        data=df_download.to_csv(index=False).encode("utf-8"),
+        file_name=f"{download_key}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+        use_container_width=True,
+        key=f"{download_key}_btn",
+    )
+
+    selection_event = st.dataframe(
+        df_table,
+                use_container_width=True,
+        hide_index=True,
+        height=390,
+        column_config={
+            "Number": st.column_config.NumberColumn("Number", width="small"),
+            "Lead ID": st.column_config.TextColumn("Lead ID", width="small"),
+            "Name": st.column_config.TextColumn("Name", width="medium"),
+            "Company": st.column_config.TextColumn("Company", width="medium"),
+            "Allocated To": st.column_config.TextColumn("Allocated To", width="medium"),
+            "Status": st.column_config.TextColumn("Status", width="small"),
+            "Brokerage Received": st.column_config.TextColumn("Brokerage Received", width="small"),
+        },
+        on_select="rerun",
+        selection_mode="single-row",
+        key=table_key,
+    )
+
+    selected_rows = selection_event.get("selection", {}).get("rows", [])
+    if selected_rows:
+        selected_idx = selected_rows[0]
+        if 0 <= selected_idx < len(leads):
+            st.session_state["selected_lead_id"] = leads[selected_idx].get("leadId")
 
 
 def compute_kpis_from_docs(docs: list[dict]) -> dict:
@@ -1230,7 +1318,7 @@ with st.sidebar:
                 st.success(f"{msg_user} Current password: {selected_password}")
                 st.session_state["generated_password_create"] = generate_strong_password(16)
             else:
-                st.error(msg_user)
+                                st.error(msg_user)
 
         users = list_dashboard_users()
         usernames = [u.get("username") for u in users if u.get("username")]
@@ -1291,12 +1379,7 @@ filters = {
 # -----------------------
 if page == "Leads":
     leads = fetch_leads(filters)
-    is_filtered = (
-        filters.get("status") != "all"
-        or filters.get("allocatedTo") != "all"
-        or filters.get("month_mode") == "month"
-        or bool(filters.get("search"))
-    )
+    is_filtered = filters_are_active(filters)
 
     kpis = compute_kpis_from_docs(leads)
     st.markdown(
@@ -1304,77 +1387,39 @@ if page == "Leads":
         unsafe_allow_html=True,
     )
 
-    if is_filtered and leads:
-        card_open("Filtered Leads", "lb-lime", "#a6ce39", subtitle="Matching leads")
-        df_table = pd.DataFrame([
-            {
-                "Number": idx + 1,
-                "Lead ID": d.get("leadId") or "—",
-                "Name": d.get("contactName") or "—",
-                "Company": d.get("companyName") or "—",
-                "Allocated To": safe_get(d, "allocatedTo.displayName") or "—",
-                "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
-                "Brokerage Received": format_inr_compact(parse_money(d.get("brokerageReceived")) or 0),
-            }
-            for idx, d in enumerate(leads)
-        ])
+    all_leads_filters = {
+        "status": "all",
+        "allocatedTo": "all",
+        "search": "",
+        "month_mode": "all",
+        "month_year": filters.get("month_year"),
+        "month_num": filters.get("month_num"),
+    }
+    all_leads = fetch_leads(all_leads_filters)
 
-        df_download = pd.DataFrame([
-            {
-                "Number": idx + 1,
-                "Lead ID": d.get("leadId") or "",
-                "Name": d.get("contactName") or "",
-                "Company": d.get("companyName") or "",
-                "Allocated To": safe_get(d, "allocatedTo.displayName") or "",
-                "Status": denormalize_lead_status(d.get("leadStatus")) or "",
-                "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
-                "Phone Number": d.get("contactPhone") or "",
-                "Email": d.get("contactEmail") or "",
-                "Comments": " | ".join(
-                    [
-                        str((n or {}).get("text") or "").strip()
-                        for n in (d.get("notes") or [])
-                        if isinstance(n, dict) and str((n or {}).get("text") or "").strip()
-                    ]
-                ),
-            }
-            for idx, d in enumerate(leads)
-        ])
-
-        st.download_button(
-            "Download Filtered Leads CSV",
-            data=df_download.to_csv(index=False).encode("utf-8"),
-            file_name=f"filtered_leads_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="download_filtered_leads_csv",
+    card_open("All Leads", "lb-lime", "#a6ce39", subtitle="Click below to expand and view all leads")
+    with st.expander("All Leads Table", expanded=False):
+        render_leads_table(
+            all_leads,
+            table_key="all_leads_table",
+            download_key="all_leads",
+            download_label="Download All Leads CSV",
         )
+    card_close()
 
-        selection_event = st.dataframe(
-            df_table,
-            use_container_width=True,
-            hide_index=True,
-            height=390,
-            column_config={
-                "Number": st.column_config.NumberColumn("Number", width="small"),
-                "Lead ID": st.column_config.TextColumn("Lead ID", width="small"),
-                "Name": st.column_config.TextColumn("Name", width="medium"),
-                "Company": st.column_config.TextColumn("Company", width="medium"),
-                "Allocated To": st.column_config.TextColumn("Allocated To", width="medium"),
-                "Status": st.column_config.TextColumn("Status", width="small"),
-                "Brokerage Received": st.column_config.TextColumn("Brokerage Received", width="small"),
-            },
-            on_select="rerun",
-            selection_mode="single-row",
-            key="filtered_leads_table",
-        )
+    table_title = "Filtered Leads" if is_filtered else "Leads"
+    table_subtitle = "Matching leads" if is_filtered else "Showing all leads (All filters selected)"
+    download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
+    download_key = "filtered_leads" if is_filtered else "leads"
 
-        selected_rows = selection_event.get("selection", {}).get("rows", [])
-        if selected_rows:
-            selected_idx = selected_rows[0]
-            if 0 <= selected_idx < len(leads):
-                st.session_state["selected_lead_id"] = leads[selected_idx].get("leadId")
-        card_close()
+    card_open(table_title, "lb-lime", "#a6ce39", subtitle=table_subtitle)
+    render_leads_table(
+        leads,
+        table_key="filtered_leads_table",
+        download_key=download_key,
+        download_label=download_label,
+    )
+    card_close()
 
     left, right = st.columns([0.45, 0.55])
 
@@ -1493,7 +1538,7 @@ if page == "Leads":
                     0,
                     0,
                     0,
-                    tzinfo=IST,
+                                    tzinfo=IST,
                 )
 
                 current_lead_id = lead.get("leadId")
