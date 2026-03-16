@@ -1516,7 +1516,7 @@ if page == "Leads":
                 c1, c2 = st.columns(2)
 
                 with c1:
-                    leadDateEdit = st.date_input("Lead date (IST)", value=existing_date_ist)
+                    leadDateEdit = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
                     companyName = st.text_input("Company", value=lead.get("companyName") or "")
                     contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
                     contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
@@ -1558,7 +1558,7 @@ if page == "Leads":
                     help="Saving will add this as a new note entry (keeps history).",
                 )
 
-                st.caption("If you change the month/year in Lead Date, the Lead ID will be regenerated to match that month.")
+                st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
                 save = st.form_submit_button("Save changes")
 
             if save:
@@ -1573,8 +1573,8 @@ if page == "Leads":
                         st.error("Brokerage must be a number (or empty).")
                         st.stop()
 
-                # ---- Lead date / Lead ID regeneration ----
-                new_lead_dt_ist = datetime(
+                # ---- Lead date update (Lead ID stays unchanged for existing leads) ----
+                updated_lead_dt_ist = datetime(
                     leadDateEdit.year,
                     leadDateEdit.month,
                     leadDateEdit.day,
@@ -1584,12 +1584,9 @@ if page == "Leads":
                     tzinfo=IST,
                 )
 
-                current_lead_id = lead.get("leadId")
-                new_lead_id, new_serial = lead_id_from_existing_or_new(new_lead_dt_ist, current_lead_id)
-
                 # ---- Updates ----
                 updates: dict = {
-                    "leadDate": new_lead_dt_ist.astimezone(timezone.utc),
+                    "leadDate": updated_lead_dt_ist.astimezone(timezone.utc),
                     "companyName": companyName.strip() or None,
                     "contactName": contactName.strip() or None,
                     "contactEmail": contactEmail.strip() or None,
@@ -1612,10 +1609,6 @@ if page == "Leads":
                             "editedBy": current_username(),
                         }
                     }
-
-                if new_lead_id != current_lead_id:
-                    updates["leadId"] = new_lead_id
-                    updates["legacyNumber"] = new_serial
 
                 try:
                     update_lead(lead_oid, updates, push_ops=allocation_push)
@@ -1710,3 +1703,10 @@ elif page == "Create Lead":
             contactName = st.text_input("Contact person")
             contactEmail = st.text_input("Email id")
             contactPhone = st.text_input("Phone number")
+
+        with c2:
+            productType = st.selectbox("Product type", ["(none)"] + product_opts)
+            leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
+            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
+            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            brokerage = st.text_input("Brokerage received", value="")
