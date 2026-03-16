@@ -878,7 +878,7 @@ def product_suggestions() -> list[str]:
 
     merged: list[str] = []
     seen: set[str] = set()
-        for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
+    for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
         key = item.strip().lower()
         if key and key not in seen:
             seen.add(key)
