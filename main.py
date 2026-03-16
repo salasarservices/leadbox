@@ -723,6 +723,14 @@ def users_col():
     return mongo_client()[DB_NAME][COLL_USERS]
 
 
+def current_username() -> str:
+    return str(st.session_state.get("logged_in_user") or "").strip().lower()
+
+
+def can_manage_deletions() -> bool:
+    return current_username() == SUPER_ADMIN_USERNAME
+
+
 def generate_strong_password(length: int = 16) -> str:
     alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
     while True:
@@ -1218,6 +1226,16 @@ def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
     col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
 
 
+def delete_lead(_id: ObjectId) -> None:
+    col = leads_col()
+    col.delete_one({"_id": _id})
+
+
+def delete_note(_id: ObjectId, note: dict) -> None:
+    col = leads_col()
+    col.update_one({"_id": _id}, {"$pull": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+
+
 def create_lead(payload: dict) -> ObjectId:
     col = leads_col()
 
@@ -1229,7 +1247,7 @@ def create_lead(payload: dict) -> ObjectId:
 
     initial_comment = (payload.get("comment") or "").strip() or None
     allocation_name = (payload.get("allocatedToDisplayName") or "").strip() or None
-    created_by = st.session_state.get("logged_in_user")
+    created_by = current_username()
 
     doc = {
         "leadId": lead_id,
@@ -1581,7 +1599,8 @@ if page == "Leads":
                     "brokerageReceived": brokerage_val,
                 }
 
-                previous_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip() or None
+                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
+                previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
                 next_alloc = (allocatedToDisplayName or "").strip() or None
                 allocation_push = None
                 if previous_alloc and next_alloc and previous_alloc.lower() != next_alloc.lower():
@@ -1590,7 +1609,7 @@ if page == "Leads":
                             "from": previous_alloc,
                             "to": next_alloc,
                             "editedAt": now_utc(),
-                            "editedBy": st.session_state.get("logged_in_user"),
+                            "editedBy": current_username(),
                         }
                     }
 
@@ -1605,9 +1624,18 @@ if page == "Leads":
                     st.stop()
 
                 if (comment_edit or "").strip():
-                    add_note(lead_oid, comment_edit.strip(), created_by=st.session_state.get("logged_in_user"))
+                    add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+
+            if can_manage_deletions():
+                st.markdown("---")
+                st.caption("Super admin only")
+                if st.button("Delete this lead", key=f"delete_lead_{lead.get('leadId')}"):
+                    delete_lead(lead_oid)
+                    st.session_state.pop("selected_lead_id", None)
+                    st.success("Lead deleted.")
+                    st.rerun()
 
         card_close()
 
@@ -1631,7 +1659,19 @@ if page == "Leads":
                 ),
                 reverse=True,
             )
-            st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
+            if can_manage_deletions() and notes_sorted:
+                for idx, note in enumerate(notes_sorted):
+                    meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
+                    st.markdown(f"**{meta}**")
+                    st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
+                    if st.button("Delete comment", key=f"del_note_{selected_lead.get('leadId')}_{idx}"):
+                        delete_note(selected_lead["_id"], note)
+                        st.success("Comment deleted.")
+                        st.rerun()
+                    if idx < len(notes_sorted) - 1:
+                        st.divider()
+            else:
+                st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
             card_close()
 
             card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
@@ -1670,43 +1710,3 @@ elif page == "Create Lead":
             contactName = st.text_input("Contact person")
             contactEmail = st.text_input("Email id")
             contactPhone = st.text_input("Phone number")
-
-        with c2:
-            productType = st.selectbox("Product type", ["(none)"] + product_opts)
-            leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
-            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
-            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-            brokerage = st.text_input("Brokerage received", value="")
-
-        comment = st.text_area("Comments (optional)", height=90, placeholder="Initial note for this lead...")
-        submitted = st.form_submit_button("Create Lead")
-
-    if submitted:
-        alloc_display = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
-        brokerage_val: Any = brokerage.strip()
-        if brokerage_val == "":
-            brokerage_val = None
-        else:
-            try:
-                brokerage_val = float(brokerage_val)
-            except ValueError:
-                st.error("Brokerage must be a number (or empty).")
-                st.stop()
-
-        new_oid = create_lead({
-            "leadDate": leadDate,
-            "companyName": companyName.strip() or None,
-            "contactName": contactName.strip() or None,
-            "contactEmail": contactEmail.strip() or None,
-            "contactPhone": contactPhone.strip() or None,
-            "productType": None if (productType or "") == "(none)" else productType,
-            "leadStatus": leadStatus,
-            "allocatedToDisplayName": alloc_display,
-            "brokerageReceived": brokerage_val,
-            "comment": comment.strip() or None,
-        })
-        created_doc = leads_col().find_one({"_id": new_oid}, {"leadId": 1})
-        created_lead_id = (created_doc or {}).get("leadId") or str(new_oid)
-        st.success(f"Lead created: {created_lead_id}")
-
-    card_close()
