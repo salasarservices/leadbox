@@ -1710,3 +1710,44 @@ elif page == "Create Lead":
             allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
+comment = st.text_area(
+            "Comments (optional)",
+            value="",
+            height=90,
+            placeholder="Add an initial comment for this lead...",
+        )
+
+        submit_new_lead = st.form_submit_button("Create lead", use_container_width=True)
+
+    if submit_new_lead:
+        brokerage_val: Any = brokerage.strip()
+        if brokerage_val == "":
+            brokerage_val = None
+        else:
+            try:
+                brokerage_val = float(brokerage_val)
+            except ValueError:
+                st.error("Brokerage must be a number (or empty).")
+                st.stop()
+
+        allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+
+        new_id = create_lead(
+            {
+                "leadDate": leadDate,
+                "companyName": companyName.strip() or None,
+                "contactName": contactName.strip() or None,
+                "contactEmail": contactEmail.strip() or None,
+                "contactPhone": contactPhone.strip() or None,
+                "productType": None if productType == "(none)" else productType,
+                "leadStatus": leadStatus,
+                "allocatedToDisplayName": allocated_to_name,
+                "brokerageReceived": brokerage_val,
+                "comment": comment.strip() or None,
+            }
+        )
+
+        created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
+        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
+
+    card_close()
