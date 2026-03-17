@@ -498,6 +498,14 @@ div[role="tooltip"] * {
   color: #ffffff !important;
 }
 
+/*Custom Button Color*/
+const buttonElement = document.querySelector('button.st-emotion-cache-9114l4.etjibo42');
+if (buttonElement) {
+  await setElementStyles(buttonElement, {
+    backgroundColor: 'blue',
+    color: 'white'
+  });
+}
 </style>
 """,
     unsafe_allow_html=True,
