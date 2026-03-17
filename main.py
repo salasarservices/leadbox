@@ -1745,12 +1745,21 @@ elif page == "Create Lead":
 
         allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
 
-        new_id = create_lead(
-            {
-                "leadDate": leadDate,
-                "companyName": companyName.strip() or None,
-                "contactName": contactName.strip() or None,
-                "contactEmail": contactEmail.strip() or None,
-                "contactPhone": contactPhone.strip() or None,
-                "productType": None if productType == "(none)" else productType,
-                "leadStatus": leadStatus,
+        create_payload = {
+            "leadDate": leadDate,
+            "companyName": companyName.strip() or None,
+            "contactName": contactName.strip() or None,
+            "contactEmail": contactEmail.strip() or None,
+            "contactPhone": contactPhone.strip() or None,
+            "productType": None if productType == "(none)" else productType,
+            "leadStatus": leadStatus,
+            "allocatedToDisplayName": allocated_to_name,
+            "brokerageReceived": brokerage_val,
+            "comment": comment.strip() or None,
+        }
+        new_id = create_lead(create_payload)
+
+        created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
+        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
+
+    card_close()
