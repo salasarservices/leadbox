@@ -848,18 +848,28 @@ def next_serial_for_month(lead_date_ist: datetime) -> int:
     col = leads_col()
     start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
     suffix = f"{MONTHS[lead_date_ist.month - 1]}{str(lead_date_ist.year)[-2:]}"
+    id_pattern = re.compile(rf"^{re.escape(LEAD_ID_PREFIX)}(\d+){suffix}$", re.IGNORECASE)
 
     max_serial = 0
-    docs = col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1, "leadId": 1})
-    for doc in docs:
-        legacy_number = doc.get("legacyNumber")
-        if isinstance(legacy_number, int):
-            max_serial = max(max_serial, legacy_number)
+    seen_ids: set[str] = set()
 
-        lead_id = str(doc.get("leadId") or "").upper()
-        match = re.fullmatch(rf"{re.escape(LEAD_ID_PREFIX)}(\d{{2}}){suffix}", lead_id)
-        if match:
-            max_serial = max(max_serial, int(match.group(1)))
+    docs_in_month = col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1, "leadId": 1})
+    docs_by_suffix = col.find({"leadId": {"$regex": rf"^{re.escape(LEAD_ID_PREFIX)}\d+{suffix}$", "$options": "i"}}, {"legacyNumber": 1, "leadId": 1})
+
+    for docs in (docs_in_month, docs_by_suffix):
+        for doc in docs:
+            lead_id = str(doc.get("leadId") or "").upper()
+            if lead_id in seen_ids:
+                continue
+            seen_ids.add(lead_id)
+
+            legacy_number = doc.get("legacyNumber")
+            if isinstance(legacy_number, int):
+                max_serial = max(max_serial, legacy_number)
+
+            match = id_pattern.fullmatch(lead_id)
+            if match:
+                max_serial = max(max_serial, int(match.group(1)))
 
     return max_serial + 1
 
@@ -1744,13 +1754,3 @@ elif page == "Create Lead":
                 "contactPhone": contactPhone.strip() or None,
                 "productType": None if productType == "(none)" else productType,
                 "leadStatus": leadStatus,
-                "allocatedToDisplayName": allocated_to_name,
-                "brokerageReceived": brokerage_val,
-                "comment": comment.strip() or None,
-            }
-        )
-
-        created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
-        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
-
-    card_close()
