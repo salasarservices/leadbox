@@ -1710,7 +1710,8 @@ elif page == "Create Lead":
             allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
-comment = st.text_area(
+
+        comment = st.text_area(
             "Comments (optional)",
             value="",
             height=90,
