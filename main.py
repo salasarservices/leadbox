@@ -847,19 +847,21 @@ def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
 def next_serial_for_month(lead_date_ist: datetime) -> int:
     col = leads_col()
     start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
+    suffix = f"{MONTHS[lead_date_ist.month - 1]}{str(lead_date_ist.year)[-2:]}"
 
-    arr = list(
-        col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1})
-        .sort([("legacyNumber", DESCENDING)])
-        .limit(1)
-    )
-    if not arr:
-        return 1
+    max_serial = 0
+    docs = col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1, "leadId": 1})
+    for doc in docs:
+        legacy_number = doc.get("legacyNumber")
+        if isinstance(legacy_number, int):
+            max_serial = max(max_serial, legacy_number)
 
-    try:
-        return int(arr[0].get("legacyNumber")) + 1
-    except Exception:
-        return 1
+        lead_id = str(doc.get("leadId") or "").upper()
+        match = re.fullmatch(rf"{re.escape(LEAD_ID_PREFIX)}(\d{{2}}){suffix}", lead_id)
+        if match:
+            max_serial = max(max_serial, int(match.group(1)))
+
+    return max_serial + 1
 
 
 def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
@@ -1242,16 +1244,11 @@ def create_lead(payload: dict) -> ObjectId:
     lead_date: date_type = payload["leadDate"]
     lead_date_local = datetime(lead_date.year, lead_date.month, lead_date.day, 0, 0, 0, tzinfo=IST)
 
-    serial = next_serial_for_month(lead_date_local)
-    lead_id = make_lead_id(serial, lead_date_local)
-
     initial_comment = (payload.get("comment") or "").strip() or None
     allocation_name = (payload.get("allocatedToDisplayName") or "").strip() or None
     created_by = current_username()
 
-    doc = {
-        "leadId": lead_id,
-        "legacyNumber": serial,
+    doc_base = {
         "leadDate": lead_date_local.astimezone(timezone.utc),
         "companyName": payload.get("companyName") or None,
         "contactName": payload.get("contactName") or None,
@@ -1270,15 +1267,20 @@ def create_lead(payload: dict) -> ObjectId:
         "updatedAt": now_utc(),
     }
 
-    try:
-        res = col.insert_one(doc)
-        return res.inserted_id
-    except DuplicateKeyError:
+    for _ in range(5):
         serial = next_serial_for_month(lead_date_local)
-        doc["legacyNumber"] = serial
-        doc["leadId"] = make_lead_id(serial, lead_date_local)
-        res = col.insert_one(doc)
-        return res.inserted_id
+        doc = {
+            **doc_base,
+            "leadId": make_lead_id(serial, lead_date_local),
+            "legacyNumber": serial,
+        }
+        try:
+            res = col.insert_one(doc)
+            return res.inserted_id
+        except DuplicateKeyError:
+            continue
+
+    raise DuplicateKeyError("Could not generate a unique leadId after multiple attempts.")
 
 
 # -----------------------
