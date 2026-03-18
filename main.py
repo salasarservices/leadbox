@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import base64
 import hmac
 import hashlib
+import json
 import os
 import re
 import secrets
@@ -14,6 +15,7 @@ import string
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as components
 from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
@@ -654,7 +656,33 @@ def show_policy_copy_dialog(lead: dict) -> None:
 
     file_bytes = base64.b64decode(encoded)
     if mime_type == "application/pdf":
-        st.pdf(file_bytes)
+        encoded_js = json.dumps(encoded)
+        file_name_js = json.dumps(file_name)
+        components.html(
+            f"""
+            <div id="policy-copy-pdf-viewer" style="height:640px;"></div>
+            <script>
+              const encoded = {encoded_js};
+              const fileName = {file_name_js};
+              const binary = atob(encoded);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i += 1) {{
+                bytes[i] = binary.charCodeAt(i);
+              }}
+              const blob = new Blob([bytes], {{ type: "application/pdf" }});
+              const blobUrl = URL.createObjectURL(blob);
+              const container = document.getElementById("policy-copy-pdf-viewer");
+              container.innerHTML = `
+                <iframe
+                  title="${{fileName}}"
+                  src="${{blobUrl}}#toolbar=1&navpanes=0&scrollbar=1"
+                  style="width:100%;height:640px;border:0;border-radius:12px;"
+                ></iframe>
+              `;
+            </script>
+            """,
+            height=640,
+        )
     elif mime_type.startswith("image/"):
         st.image(file_bytes, caption=file_name, use_container_width=True)
     else:
@@ -1937,3 +1965,6 @@ elif page == "Create Lead":
         new_id = create_lead(create_payload)
 
         created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
+        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
+
+    card_close()
