@@ -6,6 +6,7 @@ from zoneinfo import ZoneInfo
 import base64
 import hmac
 import hashlib
+import html
 import json
 import os
 import re
@@ -656,30 +657,13 @@ def show_policy_copy_dialog(lead: dict) -> None:
 
     file_bytes = base64.b64decode(encoded)
     if mime_type == "application/pdf":
-        encoded_js = json.dumps(encoded)
-        file_name_js = json.dumps(file_name)
+        file_name_html = html.escape(file_name, quote=True)
+        pdf_data_url = f"data:application/pdf;base64,{encoded}#toolbar=1&navpanes=0&scrollbar=1"
         components.html(
             f"""
-            <div id="policy-copy-pdf-viewer" style="height:640px;"></div>
-            <script>
-              const encoded = {encoded_js};
-              const fileName = {file_name_js};
-              const binary = atob(encoded);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i += 1) {{
-                bytes[i] = binary.charCodeAt(i);
-              }}
-              const blob = new Blob([bytes], {{ type: "application/pdf" }});
-              const blobUrl = URL.createObjectURL(blob);
-              const container = document.getElementById("policy-copy-pdf-viewer");
-              container.innerHTML = `
-                <iframe
-                  title="${{fileName}}"
-                  src="${{blobUrl}}#toolbar=1&navpanes=0&scrollbar=1"
-                  style="width:100%;height:640px;border:0;border-radius:12px;"
-                ></iframe>
-              `;
-            </script>
+            <iframe
+             title="{file_name_html}"
+             src="{pdf_data_url}"
             """,
             height=640,
         )
