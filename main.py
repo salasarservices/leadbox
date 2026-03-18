@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, date as date_type
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
+import base64
 import hmac
 import hashlib
 import os
@@ -546,6 +547,24 @@ def db_status_pill(ok: bool, detail: str = ""):
     )
 
 
+def encode_uploaded_file(uploaded_file: Any) -> Optional[dict]:
+    if uploaded_file is None:
+        return None
+
+    data = uploaded_file.getvalue()
+    if not data:
+        return None
+
+    mime_type = str(getattr(uploaded_file, "type", "") or "application/octet-stream").strip() or "application/octet-stream"
+    return {
+        "name": str(getattr(uploaded_file, "name", "") or "policy-copy").strip() or "policy-copy",
+        "mimeType": mime_type,
+        "data": base64.b64encode(data).decode("utf-8"),
+        "uploadedAt": now_utc(),
+        "uploadedBy": current_username() or None,
+    }
+
+
 def parse_money(value: Any) -> Optional[float]:
     if value is None:
         return None
@@ -592,6 +611,51 @@ def format_note_datetime_ist(value: Any) -> str:
         dt_ist = dt.astimezone(IST)
         return dt_ist.strftime("%d %b %Y • %I:%M %p IST")
     return "Unknown timestamp"
+
+
+def policy_copy_present(lead: dict) -> bool:
+    policy_copy = lead.get("policyCopy") or {}
+    return bool(isinstance(policy_copy, dict) and str(policy_copy.get("data") or "").strip())
+
+
+@st.dialog("Policy Copy")
+def show_policy_copy_dialog(lead: dict) -> None:
+    policy_copy = lead.get("policyCopy") or {}
+    encoded = str(policy_copy.get("data") or "").strip()
+    if not encoded:
+        st.info("No policy copy uploaded for this lead.")
+        return
+
+    mime_type = str(policy_copy.get("mimeType") or "application/pdf").strip() or "application/pdf"
+    file_name = str(policy_copy.get("name") or "policy-copy").strip() or "policy-copy"
+    uploaded_meta: list[str] = []
+    if policy_copy.get("uploadedBy"):
+        uploaded_meta.append(f"Uploaded by {policy_copy.get('uploadedBy')}")
+    if policy_copy.get("uploadedAt"):
+        uploaded_meta.append(format_note_datetime_ist(policy_copy.get("uploadedAt")))
+    if uploaded_meta:
+        st.caption(" • ".join(uploaded_meta))
+
+    file_bytes = base64.b64decode(encoded)
+    file_url = f"data:{mime_type};base64,{encoded}"
+    if mime_type == "application/pdf":
+        st.markdown(
+            f'<iframe src="{file_url}" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>',
+            unsafe_allow_html=True,
+        )
+    elif mime_type.startswith("image/"):
+        st.image(file_bytes, caption=file_name, use_container_width=True)
+    else:
+        st.info(f"Preview is not available for {file_name}. You can download the file below.")
+
+    st.download_button(
+        "Download Policy Copy",
+        data=file_bytes,
+        file_name=file_name,
+        mime=mime_type,
+        use_container_width=True,
+        key=f"download_policy_copy_{lead.get('leadId')}",
+    )
 
 
 def comments_view_html(notes: list[dict]) -> str:
@@ -1136,6 +1200,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
             "Allocated To": allocation_chain_text(d).replace("—", ""),
             "Status": denormalize_lead_status(d.get("leadStatus")) or "",
             "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
+            "Net Premium": parse_money(d.get("netPremium")) or 0,
             "Phone Number": d.get("contactPhone") or "",
             "Email": d.get("contactEmail") or "",
             "Comments": " | ".join(
@@ -1279,11 +1344,13 @@ def create_lead(payload: dict) -> ObjectId:
         "allocatedTo": {"displayName": allocation_name, "userId": None, "email": None},
         "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
         "brokerageReceived": payload.get("brokerageReceived", None),
+        "netPremium": payload.get("netPremium", None),
+        "policyCopy": payload.get("policyCopy") if normalize_lead_status(payload.get("leadStatus") or "Fresh") == "closed" else None,
         "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": created_by}] if initial_comment else []),
         "allocationHistory": ([{"from": allocation_name, "to": None, "editedAt": now_utc(), "editedBy": created_by}] if allocation_name else []),
         "emailRecipients": [],
         "messageText": None,
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
     }
@@ -1596,6 +1663,25 @@ if page == "Leads":
                     "Brokerage received",
                     value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
                 )
+                net_premium = st.text_input(
+                    "Net Premium",
+                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                )
+
+                is_closed_lead = leadStatusLabel == "Closed"
+                uploaded_policy_copy = None
+                if is_closed_lead:
+                    uploaded_policy_copy = st.file_uploader(
+                        "Policy Copy",
+                        type=["pdf", "png", "jpg", "jpeg", "webp"],
+                        help="Upload the issued policy copy for closed leads.",
+                        key=f"policy_copy_upload_{lead.get('leadId')}",
+                    )
+                    if policy_copy_present(lead):
+                        existing_policy = lead.get("policyCopy") or {}
+                        st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
+                else:
+                    st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
                 comment_edit = st.text_area(
                     "Comments (optional)",
@@ -1609,7 +1695,7 @@ if page == "Leads":
                 save = st.form_submit_button("Save changes")
 
             if save:
-                # ---- Brokerage parsing ----
+                # ---- Money parsing ----
                 brokerage_val: Any = brokerage.strip()
                 if brokerage_val == "":
                     brokerage_val = None
@@ -1619,6 +1705,18 @@ if page == "Leads":
                     except ValueError:
                         st.error("Brokerage must be a number (or empty).")
                         st.stop()
+
+                net_premium_val: Any = net_premium.strip()
+                if net_premium_val == "":
+                    net_premium_val = None
+                else:
+                    try:
+                        net_premium_val = float(net_premium_val)
+                    except ValueError:
+                        st.error("Net Premium must be a number (or empty).")
+                        st.stop()
+
+                policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatusLabel == "Closed" else None
 
                 # ---- Lead date update (Lead ID stays unchanged for existing leads) ----
                 updated_lead_dt_ist = datetime(
@@ -1641,6 +1739,8 @@ if page == "Leads":
                     "leadStatus": normalize_lead_status(leadStatusLabel),
                     "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
                     "brokerageReceived": brokerage_val,
+                    "netPremium": net_premium_val,
+                    "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
                 }
 
                 current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
@@ -1667,6 +1767,11 @@ if page == "Leads":
                     add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+
+            selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
+            if selected_status == "Closed" and policy_copy_present(selected_lead):
+                if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
+                    show_policy_copy_dialog(selected_lead)
 
             if can_manage_deletions():
                 st.markdown("---")
@@ -1757,6 +1862,18 @@ elif page == "Create Lead":
             allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
+            net_premium = st.text_input("Net Premium", value="")
+
+            uploaded_policy_copy = None
+            if leadStatus == "Closed":
+                uploaded_policy_copy = st.file_uploader(
+                    "Policy Copy",
+                    type=["pdf", "png", "jpg", "jpeg", "webp"],
+                    help="Upload the issued policy copy for closed leads.",
+                    key="create_policy_copy_upload",
+                )
+            else:
+                st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
         comment = st.text_area(
             "Comments (optional)",
@@ -1778,7 +1895,18 @@ elif page == "Create Lead":
                 st.error("Brokerage must be a number (or empty).")
                 st.stop()
 
+        net_premium_val: Any = net_premium.strip()
+        if net_premium_val == "":
+            net_premium_val = None
+        else:
+            try:
+                net_premium_val = float(net_premium_val)
+            except ValueError:
+                st.error("Net Premium must be a number (or empty).")
+                st.stop()
+
         allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+        policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatus == "Closed" else None
 
         create_payload = {
             "leadDate": leadDate,
@@ -1790,6 +1918,8 @@ elif page == "Create Lead":
             "leadStatus": leadStatus,
             "allocatedToDisplayName": allocated_to_name,
             "brokerageReceived": brokerage_val,
+            "netPremium": net_premium_val,
+            "policyCopy": policy_copy_doc,
             "comment": comment.strip() or None,
         }
         new_id = create_lead(create_payload)
