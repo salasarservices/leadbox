@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 import base64
 import hmac
 import hashlib
-import html
 import json
 import os
 import re
@@ -657,24 +656,30 @@ def show_policy_copy_dialog(lead: dict) -> None:
 
     file_bytes = base64.b64decode(encoded)
     if mime_type == "application/pdf":
-        file_name_html = html.escape(file_name, quote=True)
-        pdf_data_url = f"data:application/pdf;base64,{encoded}#toolbar=1&navpanes=0&scrollbar=1"
+        encoded_js = json.dumps(encoded)
+        file_name_js = json.dumps(file_name)
         components.html(
             f"""
-            <div style="height:640px;width:100%;overflow:hidden;border-radius:12px;background:#fff;">
-              <object
-                data="{pdf_data_url}"
-                type="application/pdf"
-                aria-label="{file_name_html}"
-                style="width:100%;height:100%;border:0;display:block;"
-              >
-                <embed
-                  src="{pdf_data_url}"
-                  type="application/pdf"
-                  style="width:100%;height:100%;border:0;display:block;"
-                />
-              </object>
-            </div>
+            <div id="policy-copy-pdf-viewer" style="height:640px;"></div>
+            <script>
+              const encoded = {encoded_js};
+              const fileName = {file_name_js};
+              const binary = atob(encoded);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i += 1) {{
+                bytes[i] = binary.charCodeAt(i);
+              }}
+              const blob = new Blob([bytes], {{ type: "application/pdf" }});
+              const blobUrl = URL.createObjectURL(blob);
+              const container = document.getElementById("policy-copy-pdf-viewer");
+              container.innerHTML = `
+                <iframe
+                  title="${{fileName}}"
+                  src="${{blobUrl}}#toolbar=1&navpanes=0&scrollbar=1"
+                  style="width:100%;height:640px;border:0;border-radius:12px;"
+                ></iframe>
+              `;
+            </script>
             """,
             height=640,
         )
@@ -841,3 +846,1125 @@ def generate_strong_password(length: int = 16) -> str:
             and any(ch in "!@#$%^&*()-_=+" for ch in pwd)
         ):
             return pwd
+
+
+def create_dashboard_user(username: str, password: str, created_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Username is required."
+    if not re.fullmatch(r"[a-z0-9._-]{3,40}", uname):
+        return False, "Username must be 3-40 chars: lowercase letters, numbers, dot, underscore, hyphen."
+    if not password:
+        return False, "Password is required."
+
+    col = users_col()
+
+    doc = {
+        "username": uname,
+        "passwordHash": hash_password(password),
+        "passwordPlain": password,
+        "createdAt": now_utc(),
+        "updatedAt": now_utc(),
+        "createdBy": (created_by or "").strip().lower() or None,
+        "isActive": True,
+        "role": "user",
+    }
+
+    try:
+        col.insert_one(doc)
+        return True, f"User '{uname}' created successfully."
+    except DuplicateKeyError:
+        return False, f"User '{uname}' already exists."
+
+
+def list_dashboard_users() -> List[dict]:
+    col = users_col()
+    return list(
+        col.find(
+            {},
+            {
+                "username": 1,
+                "passwordPlain": 1,
+                "isActive": 1,
+                "createdAt": 1,
+                "updatedAt": 1,
+            },
+        ).sort([("username", ASCENDING)])
+    )
+
+
+def set_dashboard_user_password(username: str, password: str, updated_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Select a valid user."
+    if not password:
+        return False, "Password is required."
+
+    res = users_col().update_one(
+        {"username": uname},
+        {
+            "$set": {
+                "passwordHash": hash_password(password),
+                "passwordPlain": password,
+                "updatedAt": now_utc(),
+                "updatedBy": (updated_by or "").strip().lower() or None,
+            }
+        },
+    )
+    if res.matched_count == 0:
+        return False, f"User '{uname}' not found."
+    return True, f"Password updated for '{uname}'."
+
+
+def now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def safe_get(d: dict, path: str, default=None):
+    cur = d
+    for p in path.split("."):
+        if not isinstance(cur, dict) or p not in cur:
+            return default
+        cur = cur[p]
+    return cur
+
+
+def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
+    start_ist = datetime(year, month, 1, 0, 0, 0, tzinfo=IST)
+    if month == 12:
+        end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+    else:
+        end_ist = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=IST)
+    return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
+
+
+# -----------------------
+# LeadId helpers (prefix SL)
+# -----------------------
+def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
+    nn = str(int(serial)).zfill(2)
+    mmm = MONTHS[lead_date_ist.month - 1]
+    yy = str(lead_date_ist.year)[-2:]
+    return f"{LEAD_ID_PREFIX}{nn}{mmm}{yy}"
+
+
+def next_serial_for_month(lead_date_ist: datetime) -> int:
+    col = leads_col()
+    start_utc, end_utc = month_bounds_utc(lead_date_ist.year, lead_date_ist.month)
+    suffix = f"{MONTHS[lead_date_ist.month - 1]}{str(lead_date_ist.year)[-2:]}"
+    id_pattern = re.compile(rf"^{re.escape(LEAD_ID_PREFIX)}(\d+){suffix}$", re.IGNORECASE)
+
+    max_serial = 0
+    seen_ids: set[str] = set()
+
+    docs_in_month = col.find({"leadDate": {"$gte": start_utc, "$lt": end_utc}}, {"legacyNumber": 1, "leadId": 1})
+    docs_by_suffix = col.find({"leadId": {"$regex": rf"^{re.escape(LEAD_ID_PREFIX)}\d+{suffix}$", "$options": "i"}}, {"legacyNumber": 1, "leadId": 1})
+
+    for docs in (docs_in_month, docs_by_suffix):
+        for doc in docs:
+            lead_id = str(doc.get("leadId") or "").upper()
+            if lead_id in seen_ids:
+                continue
+            seen_ids.add(lead_id)
+
+            legacy_number = doc.get("legacyNumber")
+            if isinstance(legacy_number, int):
+                max_serial = max(max_serial, legacy_number)
+
+            match = id_pattern.fullmatch(lead_id)
+            if match:
+                max_serial = max(max_serial, int(match.group(1)))
+
+    return max_serial + 1
+
+
+def lead_id_from_existing_or_new(target_lead_date_ist: datetime, existing_lead_id: Optional[str]) -> tuple[str, int]:
+    if not existing_lead_id:
+        serial = next_serial_for_month(target_lead_date_ist)
+        return make_lead_id(serial, target_lead_date_ist), serial
+
+    mmm = MONTHS[target_lead_date_ist.month - 1]
+    yy = str(target_lead_date_ist.year)[-2:]
+    suffix = f"{mmm}{yy}".upper()
+
+    if existing_lead_id.upper().endswith(suffix):
+        return existing_lead_id, -1
+
+    serial = next_serial_for_month(target_lead_date_ist)
+    return make_lead_id(serial, target_lead_date_ist), serial
+
+
+# -----------------------
+# DB init + indexes
+# -----------------------
+def ensure_indexes():
+    col = leads_col()
+    existing = col.index_information()
+    if "uniq_leadId" not in existing:
+        col.create_index([("leadId", ASCENDING)], unique=True, name="uniq_leadId")
+    if "idx_leadDate" not in existing:
+        col.create_index([("leadDate", ASCENDING)], name="idx_leadDate")
+    if "idx_leadStatus" not in existing:
+        col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
+    if "idx_allocatedTo" not in existing:
+        col.create_index([("allocatedTo.displayName", ASCENDING)], name="idx_allocatedTo")
+
+    ucol = users_col()
+    users_existing = ucol.index_information()
+    if "uniq_username" not in users_existing:
+        ucol.create_index([("username", ASCENDING)], unique=True, name="uniq_username")
+
+
+def migrate_status_terms() -> None:
+    col = leads_col()
+    col.update_many({"leadStatus": {"$in": ["not interested", "not-interested", "not_interested"]}}, {"$set": {"leadStatus": "lost", "updatedAt": now_utc()}})
+
+
+def check_db_and_init() -> tuple[bool, str]:
+    try:
+        mongo_client().admin.command("ping")
+        ensure_indexes()
+        migrate_status_terms()
+        return True, "Connected • indexes OK"
+    except Exception as e:
+        return False, str(e)
+
+
+
+
+# -----------------------
+# Suggestions
+# -----------------------
+def product_suggestions() -> list[str]:
+    col = leads_col()
+    db_values = [p for p in col.distinct("productType") if isinstance(p, str) and p.strip()]
+
+    merged: list[str] = []
+    seen: set[str] = set()
+    for item in (DEFAULT_PRODUCT_TYPES + sorted(db_values, key=lambda x: x.lower())):
+        key = item.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            merged.append(item.strip())
+    return merged
+
+
+def allocated_to_suggestions() -> list[str]:
+    col = leads_col()
+    names = [a for a in col.distinct("allocatedTo.displayName") if isinstance(a, str) and a.strip()]
+    return sorted({n.strip() for n in names}, key=lambda x: x.lower())
+
+
+def date_range_bounds_utc(start_date: date_type, end_date: date_type) -> tuple[datetime, datetime]:
+    start_ist = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0, tzinfo=IST)
+    end_exclusive_ist = datetime(end_date.year, end_date.month, end_date.day, 0, 0, 0, tzinfo=IST)
+    end_exclusive_ist = end_exclusive_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_exclusive_ist = end_exclusive_ist + pd.Timedelta(days=1)
+    return start_ist.astimezone(timezone.utc), end_exclusive_ist.astimezone(timezone.utc)
+
+
+def month_lead_counts(year: int) -> dict[int, int]:
+    col = leads_col()
+
+    start_ist = datetime(year, 1, 1, 0, 0, 0, tzinfo=IST)
+    end_ist = datetime(year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+
+    pipeline = [
+        {"$match": {"leadDate": {"$gte": start_ist.astimezone(timezone.utc), "$lt": end_ist.astimezone(timezone.utc)}}},
+        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
+        {"$group": {"_id": "$leadDateIST.month", "count": {"$sum": 1}}},
+    ]
+    res = list(col.aggregate(pipeline))
+    return {int(r["_id"]): int(r["count"]) for r in res if r.get("_id")}
+
+
+# -----------------------
+# Continuous month chart (Plotly)
+# -----------------------
+def first_month_in_db() -> datetime:
+    col = leads_col()
+    doc = list(col.find({}, {"leadDate": 1}).sort([("leadDate", ASCENDING)]).limit(1))
+    if not doc:
+        now = datetime.now(IST)
+        return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
+
+    dt = doc[0].get("leadDate")
+    if isinstance(dt, datetime):
+        dt_ist = dt.astimezone(IST)
+        return datetime(dt_ist.year, dt_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    now = datetime.now(IST)
+    return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
+
+
+def month_series_counts_df() -> pd.DataFrame:
+    col = leads_col()
+
+    start_m = first_month_in_db()
+    now_ist = datetime.now(IST)
+    end_m = datetime(now_ist.year, now_ist.month, 1, 0, 0, 0, tzinfo=IST)
+
+    start_utc = start_m.astimezone(timezone.utc)
+
+    if end_m.month == 12:
+        end_excl_ist = datetime(end_m.year + 1, 1, 1, 0, 0, 0, tzinfo=IST)
+    else:
+        end_excl_ist = datetime(end_m.year, end_m.month + 1, 1, 0, 0, 0, tzinfo=IST)
+    end_utc = end_excl_ist.astimezone(timezone.utc)
+
+    pipeline = [
+        {"$match": {"leadDate": {"$gte": start_utc, "$lt": end_utc}}},
+        {"$addFields": {"leadDateIST": {"$dateToParts": {"date": "$leadDate", "timezone": "Asia/Kolkata"}}}},
+        {"$group": {"_id": {"y": "$leadDateIST.year", "m": "$leadDateIST.month"}, "count": {"$sum": 1}}},
+    ]
+    res = list(col.aggregate(pipeline))
+    counts = {(int(r["_id"]["y"]), int(r["_id"]["m"])): int(r["count"]) for r in res if r.get("_id")}
+
+    rows: List[Dict[str, Any]] = []
+    y, m = start_m.year, start_m.month
+    while True:
+        label = f"{MONTHS[m-1]} {str(y)[-2:]}"
+        month_start_ist = datetime(y, m, 1, 0, 0, 0, tzinfo=IST)
+        rows.append({"label": label, "month_start": month_start_ist, "count": int(counts.get((y, m), 0))})
+
+        if y == end_m.year and m == end_m.month:
+            break
+
+        if m == 12:
+            y += 1
+            m = 1
+        else:
+            m += 1
+
+    return pd.DataFrame(rows).sort_values("month_start", ascending=True)
+
+
+def plot_month_series(df: pd.DataFrame) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=df["label"],
+            y=df["count"],
+            mode="lines+markers",
+            line=dict(color="#00aeef", width=3),
+            marker=dict(size=7, color="#2d448d", line=dict(width=1, color="white")),
+            hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial", size=12, color="#0f172a"),
+        xaxis=dict(title="", tickangle=-35, showgrid=False, zeroline=False, tickfont=dict(color="#475569")),
+        yaxis=dict(title="", gridcolor="rgba(15, 23, 42, 0.08)", zeroline=False, tickfont=dict(color="#475569")),
+        showlegend=False,
+    )
+    return fig
+
+
+# -----------------------
+# CRUD
+# -----------------------
+def build_query(filters: dict) -> Dict[str, Any]:
+    q: Dict[str, Any] = {}
+    if filters.get("status") and filters["status"] != "all":
+        q["leadStatus"] = normalize_lead_status(filters["status"])
+    if filters.get("allocatedTo") and filters["allocatedTo"] != "all":
+        q["allocatedTo.displayName"] = filters["allocatedTo"]
+    if filters.get("month_mode") == "month":
+        start_utc, end_utc = month_bounds_utc(filters["month_year"], filters["month_num"])
+        q["leadDate"] = {"$gte": start_utc, "$lt": end_utc}
+    elif filters.get("month_mode") == "date range":
+        start_utc, end_utc = date_range_bounds_utc(filters["range_start"], filters["range_end"])
+        q["leadDate"] = {"$gte": start_utc, "$lt": end_utc}
+    return q
+
+
+def fetch_leads(filters: dict) -> list[dict]:
+    col = leads_col()
+    q = build_query(filters)
+    docs = list(col.find(q).sort([("leadDate", DESCENDING)]))
+
+    search = (filters.get("search") or "").strip().lower()
+    if search:
+
+        def match(d: dict) -> bool:
+            fields = [
+                d.get("leadId"),
+                d.get("contactName"),
+                d.get("companyName"),
+                d.get("contactEmail"),
+                d.get("contactPhone"),
+                d.get("productType"),
+                safe_get(d, "allocatedTo.displayName"),
+                d.get("leadStatus"),
+            ]
+            return any(search in str(v).lower() for v in fields if v is not None)
+
+        docs = [d for d in docs if match(d)]
+
+    return docs
+
+
+def filters_are_active(filters: dict) -> bool:
+    return (
+        filters.get("status") != "all"
+        or filters.get("allocatedTo") != "all"
+        or filters.get("month_mode") in {"month", "date range"}
+        or bool((filters.get("search") or "").strip())
+    )
+
+
+def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df_table = pd.DataFrame([
+        {
+            "Number": idx + 1,
+            "Lead ID": d.get("leadId") or "—",
+            "Name": d.get("contactName") or "—",
+            "Company": d.get("companyName") or "—",
+            "Allocated To": allocation_chain_text(d),
+            "Status": denormalize_lead_status(d.get("leadStatus")) or "—",
+            "Brokerage Received": format_inr_compact(parse_money(d.get("brokerageReceived")) or 0),
+        }
+        for idx, d in enumerate(leads)
+    ])
+
+    df_download = pd.DataFrame([
+        {
+            "Number": idx + 1,
+            "Lead ID": d.get("leadId") or "",
+            "Name": d.get("contactName") or "",
+            "Company": d.get("companyName") or "",
+            "Allocated To": allocation_chain_text(d).replace("—", ""),
+            "Status": denormalize_lead_status(d.get("leadStatus")) or "",
+            "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
+            "Net Premium": parse_money(d.get("netPremium")) or 0,
+            "Phone Number": d.get("contactPhone") or "",
+            "Email": d.get("contactEmail") or "",
+            "Comments": " | ".join(
+                [
+                    str((n or {}).get("text") or "").strip()
+                    for n in dedupe_notes(d.get("notes") or [])
+                    if isinstance(n, dict) and str((n or {}).get("text") or "").strip()
+                ]
+            ),
+        }
+        for idx, d in enumerate(leads)
+    ])
+    return df_table, df_download
+
+
+def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, download_label: str) -> None:
+    if not leads:
+        st.info("No leads found.")
+        return
+
+    df_table, df_download = build_leads_table_frames(leads)
+    st.download_button(
+        download_label,
+        data=df_download.to_csv(index=False).encode("utf-8"),
+        file_name=f"{download_key}_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.csv",
+        mime="text/csv",
+        use_container_width=True,
+        key=f"{download_key}_btn",
+    )
+
+    selection_event = st.dataframe(
+        df_table,
+        use_container_width=True,
+        hide_index=True,
+        height=390,
+        column_config={
+            "Number": st.column_config.NumberColumn("Number", width="small"),
+            "Lead ID": st.column_config.TextColumn("Lead ID", width="small"),
+            "Name": st.column_config.TextColumn("Name", width="medium"),
+            "Company": st.column_config.TextColumn("Company", width="medium"),
+            "Allocated To": st.column_config.TextColumn("Allocated To", width="medium"),
+            "Status": st.column_config.TextColumn("Status", width="small"),
+            "Brokerage Received": st.column_config.TextColumn("Brokerage Received", width="small"),
+        },
+        on_select="rerun",
+        selection_mode="single-row",
+        key=table_key,
+    )
+
+    selected_rows = selection_event.get("selection", {}).get("rows", [])
+    if selected_rows:
+        selected_idx = selected_rows[0]
+        if 0 <= selected_idx < len(leads):
+            st.session_state["selected_lead_id"] = leads[selected_idx].get("leadId")
+
+
+def compute_kpis_from_docs(docs: list[dict]) -> dict:
+    total = len(docs)
+    interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
+    not_interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() in {"not interested", "lost"})
+    closed = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "closed")
+    total_brokerage = 0.0
+    for d in docs:
+        v = d.get("brokerageReceived")
+        if isinstance(v, (int, float)):
+            total_brokerage += float(v)
+    return {
+        "total": total,
+        "interested": interested,
+        "not_interested": not_interested,
+        "closed": closed,
+        "total_brokerage": total_brokerage,
+    }
+
+
+def fetch_kpis_from_db(q: Dict[str, Any]) -> dict:
+    col = leads_col()
+    total = col.count_documents(q)
+    interested = col.count_documents({**q, "leadStatus": "interested"})
+    not_interested = col.count_documents({**q, "leadStatus": {"$in": ["lost", "not interested"]}})
+    closed = col.count_documents({**q, "leadStatus": "closed"})
+
+    pipeline = [
+        {"$match": q},
+        {"$group": {"_id": None, "sum": {"$sum": {"$cond": [{"$isNumber": "$brokerageReceived"}, "$brokerageReceived", 0]}}}},
+    ]
+    agg = list(col.aggregate(pipeline))
+    total_brokerage = float(agg[0]["sum"]) if agg else 0.0
+
+    return {
+        "total": total,
+        "interested": interested,
+        "not_interested": not_interested,
+        "closed": closed,
+        "total_brokerage": total_brokerage,
+    }
+
+
+def update_lead(_id: ObjectId, updates: dict, push_ops: Optional[dict] = None):
+    col = leads_col()
+    updates["updatedAt"] = now_utc()
+    update_doc: dict = {"$set": updates}
+    if push_ops:
+        update_doc["$push"] = push_ops
+    col.update_one({"_id": _id}, update_doc)
+
+
+def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
+    col = leads_col()
+    note = {"text": text.strip(), "createdAt": now_utc(), "createdBy": created_by}
+    col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+
+
+def delete_lead(_id: ObjectId) -> None:
+    col = leads_col()
+    col.delete_one({"_id": _id})
+
+
+def delete_note(_id: ObjectId, note: dict) -> None:
+    col = leads_col()
+    col.update_one({"_id": _id}, {"$pull": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+
+
+def create_lead(payload: dict) -> ObjectId:
+    col = leads_col()
+
+    lead_date: date_type = payload["leadDate"]
+    lead_date_local = datetime(lead_date.year, lead_date.month, lead_date.day, 0, 0, 0, tzinfo=IST)
+
+    initial_comment = (payload.get("comment") or "").strip() or None
+    allocation_name = (payload.get("allocatedToDisplayName") or "").strip() or None
+    created_by = current_username()
+
+    doc_base = {
+        "leadDate": lead_date_local.astimezone(timezone.utc),
+        "companyName": payload.get("companyName") or None,
+        "contactName": payload.get("contactName") or None,
+        "contactEmail": payload.get("contactEmail") or None,
+        "contactPhone": payload.get("contactPhone") or None,
+        "productType": payload.get("productType") or None,
+        "allocatedTo": {"displayName": allocation_name, "userId": None, "email": None},
+        "leadStatus": normalize_lead_status(payload.get("leadStatus") or "Fresh") or "fresh",
+        "brokerageReceived": payload.get("brokerageReceived", None),
+        "netPremium": payload.get("netPremium", None),
+        "policyCopy": payload.get("policyCopy") if normalize_lead_status(payload.get("leadStatus") or "Fresh") == "closed" else None,
+        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": created_by}] if initial_comment else []),
+        "allocationHistory": ([{"from": allocation_name, "to": None, "editedAt": now_utc(), "editedBy": created_by}] if allocation_name else []),
+        "emailRecipients": [],
+        "messageText": None,
+        "schemaVersion": 4,
+        "createdAt": now_utc(),
+        "updatedAt": now_utc(),
+    }
+
+    for _ in range(5):
+        serial = next_serial_for_month(lead_date_local)
+        doc = {
+            **doc_base,
+            "leadId": make_lead_id(serial, lead_date_local),
+            "legacyNumber": serial,
+        }
+        try:
+            res = col.insert_one(doc)
+            return res.inserted_id
+        except DuplicateKeyError:
+            continue
+
+    raise DuplicateKeyError("Could not generate a unique leadId after multiple attempts.")
+
+
+# -----------------------
+# Auto-run DB init + status
+# -----------------------
+db_ok, db_detail = check_db_and_init()
+
+# -----------------------
+# Header with logo
+# -----------------------
+header_l, header_r = st.columns([0.25, 0.75], vertical_alignment="center")
+with header_l:
+    st.image(LOGO_URL, width=165)
+with header_r:
+    st.markdown(
+        "<div style='font-size:1.35rem;font-weight:800;color:#2d448d;letter-spacing:-0.02em;'>LEADBOX DASHBOARD</div>"
+        "<div style='color:#64748b;margin-top:-4px;'>Leads • Notes • Month-wise filtering</div>",
+        unsafe_allow_html=True,
+    )
+
+st.write("")
+
+# -----------------------
+# Sidebar
+# -----------------------
+with st.sidebar:
+    db_status_pill(db_ok, db_detail)
+
+    logged_in_user = st.session_state.get("logged_in_user") or "unknown"
+    st.caption(f"Signed in as: `{logged_in_user}`")
+    if st.button("Logout", use_container_width=True):
+        logout_user("You have been logged out.")
+
+    if st.button("Refresh DB", use_container_width=True):
+        clear_db_cache()
+        st.success("DB cache cleared. Data will refresh on next interaction.")
+
+    # ❌ Removed: Admin: Lead ID migration (no longer shown in sidebar)
+
+    card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
+    page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
+    card_close()
+
+    allocs = allocated_to_suggestions()
+
+    card_open("Filters", "lb-cyan", "#00aeef", subtitle="Search and segment leads")
+    status = st.selectbox("Status", ["all"] + LEAD_STATUS_OPTIONS, index=0)
+    allocatedTo = st.selectbox("Allocated to", ["all"] + allocs, index=0)
+    search = st.text_input("Search", value="", placeholder="Lead ID, contact, company, email, phone...")
+    card_close()
+
+    card_open("Month Filters", "lb-lime", "#a6ce39", subtitle="View lead activity month-wise (IST)")
+    month_mode = st.selectbox("Filter by", ["all", "month", "date range"], index=0)
+
+    month_year = datetime.now(IST).year
+    month_num = datetime.now(IST).month
+    date_range_default = (datetime.now(IST).date().replace(day=1), datetime.now(IST).date())
+    range_start, range_end = date_range_default
+
+    if month_mode == "month":
+        month_year = st.number_input("Year", min_value=2020, max_value=2100, value=month_year, step=1)
+        counts = month_lead_counts(int(month_year))
+        month_num = st.selectbox(
+            "Month",
+            options=list(range(1, 13)),
+            index=month_num - 1,
+            format_func=lambda m: f"{MONTHS[m-1]} ({counts.get(m, 0)})",
+        )
+    elif month_mode == "date range":
+        selected_range = st.date_input(
+            "Date range (IST)",
+            value=date_range_default,
+            help="Select a start and end date to view leads created within that IST date range.",
+        )
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            range_start, range_end = selected_range
+        elif isinstance(selected_range, list) and len(selected_range) == 2:
+            range_start, range_end = selected_range[0], selected_range[1]
+        else:
+            range_start = range_end = selected_range if not isinstance(selected_range, (tuple, list)) else datetime.now(IST).date()
+
+        if range_start > range_end:
+            range_start, range_end = range_end, range_start
+    card_close()
+
+    if st.session_state.get("is_super_admin") is True:
+        card_open("User Management", "lb-navy", "#2d448d", subtitle="Add users, manage passwords, and reveal current user credentials")
+
+        if "generated_password_create" not in st.session_state:
+            st.session_state["generated_password_create"] = generate_strong_password(16)
+
+        with st.form("create_user_form"):
+            new_username = st.text_input("New Username", placeholder="e.g. team.member")
+            generated_password = st.session_state.get("generated_password_create") or generate_strong_password(16)
+            selected_password = st.text_input(
+                "Generated Strong Password",
+                value=generated_password,
+                help="Editable for super-admin: keep generated value or enter your own password.",
+            )
+            create_cols = st.columns(2)
+            with create_cols[0]:
+                refresh_generated = st.form_submit_button("Regenerate Password")
+            with create_cols[1]:
+                create_user_btn = st.form_submit_button("Add User")
+
+        if refresh_generated:
+            st.session_state["generated_password_create"] = generate_strong_password(16)
+            st.rerun()
+
+        if create_user_btn:
+            ok_user, msg_user = create_dashboard_user(
+                username=new_username,
+                password=selected_password,
+                created_by=st.session_state.get("logged_in_user"),
+            )
+            if ok_user:
+                st.success(f"{msg_user} Current password: {selected_password}")
+                st.session_state["generated_password_create"] = generate_strong_password(16)
+            else:
+                st.error(msg_user)
+
+        users = list_dashboard_users()
+        usernames = [u.get("username") for u in users if u.get("username")]
+        with st.form("change_user_password_form"):
+            st.markdown("**Change Existing User Password**")
+            selected_user = st.selectbox("Select User", options=usernames) if usernames else None
+            generated_update_password = generate_strong_password(16)
+            updated_password = st.text_input(
+                "New Password (Editable Generated Password)",
+                value=generated_update_password,
+                help="Use generated password or enter your preferred password.",
+            )
+            update_password_btn = st.form_submit_button("Update Password")
+
+        if update_password_btn:
+            if not selected_user:
+                st.error("No users available to update.")
+            else:
+                ok_upd, msg_upd = set_dashboard_user_password(
+                    username=selected_user,
+                    password=updated_password,
+                    updated_by=st.session_state.get("logged_in_user"),
+                )
+                if ok_upd:
+                    st.success(msg_upd)
+                else:
+                    st.error(msg_upd)
+
+        with st.expander("Click to reveal current users and passwords"):
+            users = list_dashboard_users()
+            if not users:
+                st.info("No users found.")
+            else:
+                reveal_rows = []
+                for user_doc in users:
+                    reveal_rows.append(
+                        {
+                            "Username": user_doc.get("username") or "—",
+                            "Current Password": user_doc.get("passwordPlain") or "(legacy/unknown)",
+                            "Active": "Yes" if user_doc.get("isActive", True) else "No",
+                        }
+                    )
+                st.dataframe(pd.DataFrame(reveal_rows), use_container_width=True, hide_index=True)
+
+        card_close()
+
+filters = {
+    "status": status,
+    "allocatedTo": allocatedTo,
+    "search": search,
+    "month_mode": month_mode,
+    "month_year": int(month_year),
+    "month_num": int(month_num),
+    "range_start": range_start,
+    "range_end": range_end,
+}
+
+# -----------------------
+# Pages
+# -----------------------
+if page == "Leads":
+    leads = fetch_leads(filters)
+    is_filtered = filters_are_active(filters)
+
+    kpis = compute_kpis_from_docs(leads)
+    st.markdown(
+        kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
+        unsafe_allow_html=True,
+    )
+
+    table_title = "Filtered Leads" if is_filtered else "Leads"
+    if filters.get("month_mode") == "date range":
+        start_label = filters["range_start"].strftime("%d %b %Y")
+        end_label = filters["range_end"].strftime("%d %b %Y")
+        table_subtitle = f"Leads in selected range ({start_label} - {end_label}): {len(leads)}"
+    else:
+        table_subtitle = f"Matching leads: {len(leads)}" if is_filtered else f"Showing all leads: {len(leads)}"
+    download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
+    download_key = "filtered_leads" if is_filtered else "leads"
+
+    card_open(table_title, "lb-lime", "#a6ce39", subtitle=table_subtitle)
+    render_leads_table(
+        leads,
+        table_key="filtered_leads_table",
+        download_key=download_key,
+        download_label=download_label,
+    )
+    card_close()
+
+    left, right = st.columns([0.45, 0.55])
+
+    with left:
+        card_open("Details", "lb-navy", "#2d448d", subtitle="Select a lead to view or edit")
+
+        def lead_label(d: dict) -> str:
+            lid = d.get("leadId") or "?"
+            name = (d.get("contactName") or "").strip()
+            status = denormalize_lead_status(d.get("leadStatus") or "") or "—"
+            return f"{lid} — {name} [{status}]"
+
+        lead_options = [lead_label(d) for d in leads]
+        lead_map = {lead_label(d): d for d in leads}
+        lead_index_by_id = {str(d.get("leadId") or ""): idx for idx, d in enumerate(leads)}
+
+        st.markdown('<div class="lb-lead-picker-title">Select a lead</div>', unsafe_allow_html=True)
+        if lead_options:
+            default_idx = 0
+            selected_lead_id = str(st.session_state.get("selected_lead_id") or "")
+            if selected_lead_id and selected_lead_id in lead_index_by_id:
+                default_idx = lead_index_by_id[selected_lead_id]
+            selected_label = st.selectbox(
+                "Select a lead",
+                lead_options,
+                index=default_idx,
+                label_visibility="collapsed",
+            )
+        else:
+            selected_label = st.selectbox("Select a lead", ["(no leads found)"], index=0, label_visibility="collapsed")
+
+        selected_lead = lead_map.get(selected_label)
+        if selected_lead:
+            st.session_state["selected_lead_id"] = selected_lead.get("leadId")
+
+        if selected_lead:
+            lead = selected_lead
+            lead_oid = lead["_id"]
+
+            existing_dt = lead.get("leadDate")
+            if isinstance(existing_dt, datetime):
+                existing_date_ist = existing_dt.astimezone(IST).date()
+            else:
+                existing_date_ist = datetime.now(IST).date()
+
+            existing_notes = dedupe_notes(lead.get("notes") or [])
+            existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
+
+            save = False
+            with st.form("edit_lead_form"):
+                c1, c2 = st.columns(2)
+
+                with c1:
+                    leadDateEdit = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
+                    companyName = st.text_input("Company", value=lead.get("companyName") or "")
+                    contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
+                    contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
+                    contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
+
+                with c2:
+                    current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+                    status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
+                    leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
+
+                    alloc_opts = allocated_to_suggestions()
+                    current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+
+                    alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+                    if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+                        alloc_options.insert(2, current_alloc)
+
+                    alloc_index = 0
+                    if current_alloc:
+                        try:
+                            alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+                        except ValueError:
+                            alloc_index = 0
+
+                    allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
+                    allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+                    allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+
+                brokerage = st.text_input(
+                    "Brokerage received",
+                    value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+                )
+                net_premium = st.text_input(
+                    "Net Premium",
+                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                )
+
+                is_closed_lead = leadStatusLabel == "Closed"
+                uploaded_policy_copy = None
+                if is_closed_lead:
+                    uploaded_policy_copy = st.file_uploader(
+                        "Policy Copy",
+                        type=["pdf", "png", "jpg", "jpeg", "webp"],
+                        help="Upload the issued policy copy for closed leads.",
+                        key=f"policy_copy_upload_{lead.get('leadId')}",
+                    )
+                    if policy_copy_present(lead):
+                        existing_policy = lead.get("policyCopy") or {}
+                        st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
+                else:
+                    st.caption("Policy Copy upload is available only when the lead status is Closed.")
+
+                comment_edit = st.text_area(
+                    "Comments (optional)",
+                    value=existing_comment_default,
+                    height=90,
+                    placeholder="Update comment for this lead...",
+                    help="Saving will add this as a new note entry (keeps history).",
+                )
+
+                st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
+                save = st.form_submit_button("Save changes")
+
+            if save:
+                # ---- Money parsing ----
+                brokerage_val: Any = brokerage.strip()
+                if brokerage_val == "":
+                    brokerage_val = None
+                else:
+                    try:
+                        brokerage_val = float(brokerage_val)
+                    except ValueError:
+                        st.error("Brokerage must be a number (or empty).")
+                        st.stop()
+
+                net_premium_val: Any = net_premium.strip()
+                if net_premium_val == "":
+                    net_premium_val = None
+                else:
+                    try:
+                        net_premium_val = float(net_premium_val)
+                    except ValueError:
+                        st.error("Net Premium must be a number (or empty).")
+                        st.stop()
+
+                policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatusLabel == "Closed" else None
+
+                # ---- Lead date update (Lead ID stays unchanged for existing leads) ----
+                updated_lead_dt_ist = datetime(
+                    leadDateEdit.year,
+                    leadDateEdit.month,
+                    leadDateEdit.day,
+                    0,
+                    0,
+                    0,
+                    tzinfo=IST,
+                )
+
+                # ---- Updates ----
+                updates: dict = {
+                    "leadDate": updated_lead_dt_ist.astimezone(timezone.utc),
+                    "companyName": companyName.strip() or None,
+                    "contactName": contactName.strip() or None,
+                    "contactEmail": contactEmail.strip() or None,
+                    "contactPhone": contactPhone.strip() or None,
+                    "leadStatus": normalize_lead_status(leadStatusLabel),
+                    "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
+                    "brokerageReceived": brokerage_val,
+                    "netPremium": net_premium_val,
+                    "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
+                }
+
+                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
+                previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
+                next_alloc = (allocatedToDisplayName or "").strip() or None
+                allocation_push = None
+                if previous_alloc and next_alloc and previous_alloc.lower() != next_alloc.lower():
+                    allocation_push = {
+                        "allocationHistory": {
+                            "from": previous_alloc,
+                            "to": next_alloc,
+                            "editedAt": now_utc(),
+                            "editedBy": current_username(),
+                        }
+                    }
+
+                try:
+                    update_lead(lead_oid, updates, push_ops=allocation_push)
+                except DuplicateKeyError:
+                    st.error("Lead ID collision occurred. Try saving again.")
+                    st.stop()
+
+                if (comment_edit or "").strip() and (comment_edit or "").strip() != existing_comment_default.strip():
+                    add_note(lead_oid, comment_edit.strip(), created_by=current_username())
+
+                st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+
+            selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
+            if selected_status == "Closed" and policy_copy_present(selected_lead):
+                if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
+                    show_policy_copy_dialog(selected_lead)
+
+            if can_manage_deletions():
+                st.markdown("---")
+                st.caption("Super admin only")
+                if st.button("Delete this lead", key=f"delete_lead_{lead.get('leadId')}"):
+                    delete_lead(lead_oid)
+                    st.session_state.pop("selected_lead_id", None)
+                    st.success("Lead deleted.")
+                    st.rerun()
+
+        card_close()
+
+    with right:
+        try:
+            df_chart = month_series_counts_df()
+            if not df_chart.empty:
+                card_open("Month-Wise Leads", "lb-cyan", "#00aeef", subtitle="Lead activity over time")
+                st.plotly_chart(plot_month_series(df_chart), use_container_width=True)
+                card_close()
+        except Exception:
+            pass
+
+        if selected_lead:
+            card_open("Comments", "lb-lime", "#a6ce39", subtitle="Read-only timeline from database")
+            notes = dedupe_notes([n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)])
+            notes_sorted = sorted(
+                notes,
+                key=lambda n: (
+                    n.get("createdAt") if isinstance(n.get("createdAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc)
+                ),
+                reverse=True,
+            )
+            if can_manage_deletions() and notes_sorted:
+                for idx, note in enumerate(notes_sorted):
+                    meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
+                    st.markdown(f"**{meta}**")
+                    st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
+                    if st.button("Delete comment", key=f"del_note_{selected_lead.get('leadId')}_{idx}"):
+                        delete_note(selected_lead["_id"], note)
+                        st.success("Comment deleted.")
+                        st.rerun()
+                    if idx < len(notes_sorted) - 1:
+                        st.divider()
+            else:
+                st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
+            card_close()
+
+            card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
+            history_rows = [h for h in (selected_lead.get("allocationHistory") or []) if isinstance(h, dict)]
+            history_rows = sorted(
+                history_rows,
+                key=lambda h: h.get("editedAt") if isinstance(h.get("editedAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc),
+            )
+            if history_rows:
+                view_rows: list[dict] = []
+                for h in history_rows:
+                    view_rows.append(
+                        {
+                            "First Allocation": (h.get("from") or "—") if h.get("from") else "—",
+                            "Re-Allocated To": (h.get("to") or "—") if h.get("to") else "—",
+                            "Edited By": (h.get("editedBy") or "Unknown user") if h.get("editedBy") else "Unknown user",
+                            "Date & Time": format_note_datetime_ist(h.get("editedAt")),
+                        }
+                    )
+                st.dataframe(pd.DataFrame(view_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info("No allocation history available for this lead.")
+            card_close()
+
+elif page == "Create Lead":
+    card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
+    product_opts = product_suggestions()
+    alloc_opts = allocated_to_suggestions()
+
+    with st.form("create_lead_form"):
+        c1, c2 = st.columns(2)
+
+        with c1:
+            leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
+            companyName = st.text_input("Company")
+            contactName = st.text_input("Contact person")
+            contactEmail = st.text_input("Email id")
+            contactPhone = st.text_input("Phone number")
+
+        with c2:
+            productType = st.selectbox("Product type", ["(none)"] + product_opts)
+            leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
+            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
+            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            brokerage = st.text_input("Brokerage received", value="")
+            net_premium = st.text_input("Net Premium", value="")
+
+            uploaded_policy_copy = None
+            if leadStatus == "Closed":
+                uploaded_policy_copy = st.file_uploader(
+                    "Policy Copy",
+                    type=["pdf", "png", "jpg", "jpeg", "webp"],
+                    help="Upload the issued policy copy for closed leads.",
+                    key="create_policy_copy_upload",
+                )
+            else:
+                st.caption("Policy Copy upload is available only when the lead status is Closed.")
+
+        comment = st.text_area(
+            "Comments (optional)",
+            value="",
+            height=90,
+            placeholder="Add an initial comment for this lead...",
+        )
+
+        submit_new_lead = st.form_submit_button("Create lead", use_container_width=True)
+
+    if submit_new_lead:
+        brokerage_val: Any = brokerage.strip()
+        if brokerage_val == "":
+            brokerage_val = None
+        else:
+            try:
+                brokerage_val = float(brokerage_val)
+            except ValueError:
+                st.error("Brokerage must be a number (or empty).")
+                st.stop()
+
+        net_premium_val: Any = net_premium.strip()
+        if net_premium_val == "":
+            net_premium_val = None
+        else:
+            try:
+                net_premium_val = float(net_premium_val)
+            except ValueError:
+                st.error("Net Premium must be a number (or empty).")
+                st.stop()
+
+        allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+        policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatus == "Closed" else None
+
+        create_payload = {
+            "leadDate": leadDate,
+            "companyName": companyName.strip() or None,
+            "contactName": contactName.strip() or None,
+            "contactEmail": contactEmail.strip() or None,
+            "contactPhone": contactPhone.strip() or None,
+            "productType": None if productType == "(none)" else productType,
+            "leadStatus": leadStatus,
+            "allocatedToDisplayName": allocated_to_name,
+            "brokerageReceived": brokerage_val,
+            "netPremium": net_premium_val,
+            "policyCopy": policy_copy_doc,
+            "comment": comment.strip() or None,
+        }
+        new_id = create_lead(create_payload)
+
+        created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
+        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
+
+    card_close()
