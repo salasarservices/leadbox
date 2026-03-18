@@ -951,6 +951,14 @@ def allocated_to_suggestions() -> list[str]:
     return sorted({n.strip() for n in names}, key=lambda x: x.lower())
 
 
+def date_range_bounds_utc(start_date: date_type, end_date: date_type) -> tuple[datetime, datetime]:
+    start_ist = datetime(start_date.year, start_date.month, start_date.day, 0, 0, 0, tzinfo=IST)
+    end_exclusive_ist = datetime(end_date.year, end_date.month, end_date.day, 0, 0, 0, tzinfo=IST)
+    end_exclusive_ist = end_exclusive_ist.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_exclusive_ist = end_exclusive_ist + pd.Timedelta(days=1)
+    return start_ist.astimezone(timezone.utc), end_exclusive_ist.astimezone(timezone.utc)
+
+
 def month_lead_counts(year: int) -> dict[int, int]:
     col = leads_col()
 
@@ -1064,6 +1072,9 @@ def build_query(filters: dict) -> Dict[str, Any]:
     if filters.get("month_mode") == "month":
         start_utc, end_utc = month_bounds_utc(filters["month_year"], filters["month_num"])
         q["leadDate"] = {"$gte": start_utc, "$lt": end_utc}
+    elif filters.get("month_mode") == "date range":
+        start_utc, end_utc = date_range_bounds_utc(filters["range_start"], filters["range_end"])
+        q["leadDate"] = {"$gte": start_utc, "$lt": end_utc}
     return q
 
 
@@ -1097,7 +1108,7 @@ def filters_are_active(filters: dict) -> bool:
     return (
         filters.get("status") != "all"
         or filters.get("allocatedTo") != "all"
-        or filters.get("month_mode") == "month"
+        or filters.get("month_mode") in {"month", "date range"}
         or bool((filters.get("search") or "").strip())
     )
 
@@ -1343,10 +1354,12 @@ with st.sidebar:
     card_close()
 
     card_open("Month Filters", "lb-lime", "#a6ce39", subtitle="View lead activity month-wise (IST)")
-    month_mode = st.selectbox("Filter by", ["all", "month"], index=0)
+    month_mode = st.selectbox("Filter by", ["all", "month", "date range"], index=0)
 
     month_year = datetime.now(IST).year
     month_num = datetime.now(IST).month
+    date_range_default = (datetime.now(IST).date().replace(day=1), datetime.now(IST).date())
+    range_start, range_end = date_range_default
 
     if month_mode == "month":
         month_year = st.number_input("Year", min_value=2020, max_value=2100, value=month_year, step=1)
@@ -1357,6 +1370,21 @@ with st.sidebar:
             index=month_num - 1,
             format_func=lambda m: f"{MONTHS[m-1]} ({counts.get(m, 0)})",
         )
+    elif month_mode == "date range":
+        selected_range = st.date_input(
+            "Date range (IST)",
+            value=date_range_default,
+            help="Select a start and end date to view leads created within that IST date range.",
+        )
+        if isinstance(selected_range, tuple) and len(selected_range) == 2:
+            range_start, range_end = selected_range
+        elif isinstance(selected_range, list) and len(selected_range) == 2:
+            range_start, range_end = selected_range[0], selected_range[1]
+        else:
+            range_start = range_end = selected_range if not isinstance(selected_range, (tuple, list)) else datetime.now(IST).date()
+
+        if range_start > range_end:
+            range_start, range_end = range_end, range_start
     card_close()
 
     if st.session_state.get("is_super_admin") is True:
@@ -1447,6 +1475,8 @@ filters = {
     "month_mode": month_mode,
     "month_year": int(month_year),
     "month_num": int(month_num),
+    "range_start": range_start,
+    "range_end": range_end,
 }
 
 # -----------------------
@@ -1463,7 +1493,12 @@ if page == "Leads":
     )
 
     table_title = "Filtered Leads" if is_filtered else "Leads"
-    table_subtitle = "Matching leads" if is_filtered else "Showing all leads"
+    if filters.get("month_mode") == "date range":
+        start_label = filters["range_start"].strftime("%d %b %Y")
+        end_label = filters["range_end"].strftime("%d %b %Y")
+        table_subtitle = f"Leads in selected range ({start_label} - {end_label}): {len(leads)}"
+    else:
+        table_subtitle = f"Matching leads: {len(leads)}" if is_filtered else f"Showing all leads: {len(leads)}"
     download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
     download_key = "filtered_leads" if is_filtered else "leads"
 
