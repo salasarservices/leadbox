@@ -618,6 +618,22 @@ def policy_copy_present(lead: dict) -> bool:
     return bool(isinstance(policy_copy, dict) and str(policy_copy.get("data") or "").strip())
 
 
+def dedupe_notes(notes: list[dict]) -> list[dict]:
+    deduped: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for note in notes:
+        if not isinstance(note, dict):
+            continue
+        text = str((note or {}).get("text") or "").strip()
+        author = str((note or {}).get("createdBy") or "").strip().lower()
+        key = (text, author)
+        if not text or key in seen:
+            continue
+        seen.add(key)
+        deduped.append(note)
+    return deduped
+
+
 @st.dialog("Policy Copy")
 def show_policy_copy_dialog(lead: dict) -> None:
     policy_copy = lead.get("policyCopy") or {}
@@ -637,12 +653,8 @@ def show_policy_copy_dialog(lead: dict) -> None:
         st.caption(" • ".join(uploaded_meta))
 
     file_bytes = base64.b64decode(encoded)
-    file_url = f"data:{mime_type};base64,{encoded}"
     if mime_type == "application/pdf":
-        st.markdown(
-            f'<iframe src="{file_url}" width="100%" height="640" style="border:0;border-radius:12px;"></iframe>',
-            unsafe_allow_html=True,
-        )
+        st.pdf(file_bytes)
     elif mime_type.startswith("image/"):
         st.image(file_bytes, caption=file_name, use_container_width=True)
     else:
@@ -1206,7 +1218,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
             "Comments": " | ".join(
                 [
                     str((n or {}).get("text") or "").strip()
-                    for n in (d.get("notes") or [])
+                    for n in dedupe_notes(d.get("notes") or [])
                     if isinstance(n, dict) and str((n or {}).get("text") or "").strip()
                 ]
             ),
@@ -1622,7 +1634,7 @@ if page == "Leads":
             else:
                 existing_date_ist = datetime.now(IST).date()
 
-            existing_notes = lead.get("notes") or []
+            existing_notes = dedupe_notes(lead.get("notes") or [])
             existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
 
             save = False
@@ -1763,7 +1775,7 @@ if page == "Leads":
                     st.error("Lead ID collision occurred. Try saving again.")
                     st.stop()
 
-                if (comment_edit or "").strip():
+                if (comment_edit or "").strip() and (comment_edit or "").strip() != existing_comment_default.strip():
                     add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
@@ -1796,7 +1808,7 @@ if page == "Leads":
 
         if selected_lead:
             card_open("Comments", "lb-lime", "#a6ce39", subtitle="Read-only timeline from database")
-            notes = [n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)]
+            notes = dedupe_notes([n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)])
             notes_sorted = sorted(
                 notes,
                 key=lambda n: (
@@ -1925,6 +1937,3 @@ elif page == "Create Lead":
         new_id = create_lead(create_payload)
 
         created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
-        st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
-
-    card_close()
