@@ -1,7 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700;800&display=swap');
+
 :root{
   --navy:#2d448d;
   --lime:#a6ce39;
   --cyan:#00aeef;
+  --app-font:'Open Sans', sans-serif;
 
   --bg:#F7F9FC;
   --card:#FFFFFF;
@@ -14,6 +17,19 @@
   --muted:#64748b;
   --border: rgba(15, 23, 42, 0.08);
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.stApp,
+.stApp button,
+.stApp input,
+.stApp textarea,
+.stApp select,
+.stApp label,
+.stApp [data-baseweb],
+.stMarkdown,
+.stDataFrame,
+.stAlert {
+  font-family: var(--app-font);
 }
 
 .stApp { background: var(--bg); color: var(--text); }
