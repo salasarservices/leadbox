@@ -983,7 +983,7 @@ LEAD_STATUS_BADGE_STYLES: dict[str, dict[str, str]] = {
     "allocated": {"text": "#216DBF", "bg": "#ede9fe", "border": "#c4b5fd"},
     "interested": {"text": "#216DBF", "bg": "#27E0F5", "border": "#6ee7b7"},
     "lost": {"text": "#216DBF", "bg": "#fee2e2", "border": "#fca5a5"},
-    "closed": {"text": "#216DBF", "bg": "#ccfbf1", "border": "#5eead4"},
+    "closed": {"text": "#216DBF", "bg": "#F2A757", "border": "#5eead4"},
 }
 
 
