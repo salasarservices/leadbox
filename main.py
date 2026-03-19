@@ -1471,76 +1471,117 @@ if page == "Leads":
             existing_notes = dedupe_notes(lead.get("notes") or [])
             existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
 
-            save = False
-            with st.form("edit_lead_form"):
-                c1, c2 = st.columns(2)
+            c1, c2 = st.columns(2)
 
-                with c1:
-                    leadDateEdit = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
-                    companyName = st.text_input("Company", value=lead.get("companyName") or "")
-                    contactName = st.text_input("Contact person", value=lead.get("contactName") or "")
-                    contactEmail = st.text_input("Email id", value=lead.get("contactEmail") or "")
-                    contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
-
-                with c2:
-                    current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-                    status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
-                    leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
-
-                    alloc_opts = allocated_to_suggestions()
-                    current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
-
-                    alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
-                    if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-                        alloc_options.insert(2, current_alloc)
-
-                    alloc_index = 0
-                    if current_alloc:
-                        try:
-                            alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
-                        except ValueError:
-                            alloc_index = 0
-
-                    allocPick = st.selectbox("Allocated to (choose)", alloc_options, index=alloc_index)
-                    allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
-                    allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
-
-                brokerage = st.text_input(
-                    "Brokerage received",
-                    value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+            with c1:
+                leadDateEdit = st.date_input(
+                    "Lead date (IST)",
+                    value=existing_date_ist,
+                    key=f"edit_lead_date_{lead.get('leadId')}",
+                )
+                companyName = st.text_input(
+                    "Company",
+                    value=lead.get("companyName") or "",
+                    key=f"edit_company_{lead.get('leadId')}",
+                )
+                contactName = st.text_input(
+                    "Contact person",
+                    value=lead.get("contactName") or "",
+                    key=f"edit_contact_name_{lead.get('leadId')}",
+                )
+                contactEmail = st.text_input(
+                    "Email id",
+                    value=lead.get("contactEmail") or "",
+                    key=f"edit_contact_email_{lead.get('leadId')}",
+                )
+                contactPhone = st.text_input(
+                    "Phone number",
+                    value=lead.get("contactPhone") or "",
+                    key=f"edit_contact_phone_{lead.get('leadId')}",
                 )
 
-                is_closed_lead = leadStatusLabel == "Closed"
-                net_premium = ""
-                if is_closed_lead:
-                    net_premium = st.text_input(
-                        "Net Premium",
-                        value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
-                    )
-                uploaded_policy_copy = None
-                if is_closed_lead:
-                    uploaded_policy_copy = st.file_uploader(
-                        "Policy Copy",
-                        type=["pdf", "png", "jpg", "jpeg", "webp"],
-                        help="Upload the issued policy copy for closed leads.",
-                        key=f"policy_copy_upload_{lead.get('leadId')}",
-                    )
-                    if policy_copy_present(lead):
-                        existing_policy = lead.get("policyCopy") or {}
-                        st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
-                else:
-                    st.caption("Policy Copy upload is available only when the lead status is Closed.")
-
-                comment_edit = st.text_area(
-                    "Comments (optional)",
-                    value=existing_comment_default,
-                    height=90,
-                    placeholder="Update comment for this lead...",
-                    help="Saving will add this as a new note entry (keeps history).",
+            with c2:
+                current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+                status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
+                leadStatusLabel = st.selectbox(
+                    "Lead status",
+                    LEAD_STATUS_OPTIONS,
+                    index=status_index,
+                    key=f"edit_status_{lead.get('leadId')}",
                 )
 
-                st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
-                save = st.form_submit_button("Save changes")
+                alloc_opts = allocated_to_suggestions()
+                current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+
+                alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+                if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+                    alloc_options.insert(2, current_alloc)
+
+                alloc_index = 0
+                if current_alloc:
+                    try:
+                        alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+                    except ValueError:
+                        alloc_index = 0
+
+                allocPick = st.selectbox(
+                    "Allocated to (choose)",
+                    alloc_options,
+                    index=alloc_index,
+                    key=f"edit_alloc_pick_{lead.get('leadId')}",
+                )
+                allocTyped = st.text_input(
+                    "Or type allocated to (adds new)",
+                    value="",
+                    placeholder="Type a new name here...",
+                    key=f"edit_alloc_typed_{lead.get('leadId')}",
+                )
+                allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
+
+            brokerage = st.text_input(
+                "Brokerage received",
+                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+                key=f"edit_brokerage_{lead.get('leadId')}",
+            )
+
+            original_status_label = denormalize_lead_status(lead.get("leadStatus"))
+            show_closed_fields = leadStatusLabel == "Closed"
+            is_newly_marked_closed = original_status_label != "Closed" and show_closed_fields
+
+            net_premium = ""
+            if show_closed_fields:
+                net_premium = st.text_input(
+                    "Net Premium",
+                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                    key=f"edit_net_premium_{lead.get('leadId')}",
+                )
+            uploaded_policy_copy = None
+            if show_closed_fields:
+                if is_newly_marked_closed:
+                    st.info("This lead will now require net premium details and a policy copy before saving as Closed.")
+                uploaded_policy_copy = st.file_uploader(
+                    "Policy Copy",
+                    type=["pdf", "png", "jpg", "jpeg", "webp"],
+                    help="Upload the issued policy copy for closed leads.",
+                    key=f"policy_copy_upload_{lead.get('leadId')}",
+                )
+                if policy_copy_present(lead):
+                    existing_policy = lead.get("policyCopy") or {}
+                    st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
+            else:
+                st.caption("Policy Copy upload is available only when the lead status is Closed.")
+
+            comment_edit = st.text_area(
+                "Comments (optional)",
+                value=existing_comment_default,
+                height=90,
+                placeholder="Update comment for this lead...",
+                help="Saving will add this as a new note entry (keeps history).",
+                key=f"edit_comment_{lead.get('leadId')}",
+            )
+
+            st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
+            save = st.button("Save changes", key=f"save_lead_{lead.get('leadId')}", use_container_width=True)
 
             if save:
                 # ---- Money parsing ----
