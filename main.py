@@ -1661,14 +1661,6 @@ if page == "Leads":
             existing_notes = dedupe_notes(lead.get("notes") or [])
             existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
 
-            # ---- Live status key: outside the form so conditional fields react on change ----
-            _edit_status_key = f"edit_lead_status_{lead.get('leadId')}"
-            _current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-            if _edit_status_key not in st.session_state:
-                st.session_state[_edit_status_key] = (
-                    _current_status_label if _current_status_label in LEAD_STATUS_OPTIONS else LEAD_STATUS_OPTIONS[0]
-                )
-
             save = False
             with st.form("edit_lead_form"):
                 c1, c2 = st.columns(2)
@@ -1681,17 +1673,9 @@ if page == "Leads":
                     contactPhone = st.text_input("Phone number", value=lead.get("contactPhone") or "")
 
                 with c2:
-                    status_index = (
-                        LEAD_STATUS_OPTIONS.index(st.session_state[_edit_status_key])
-                        if st.session_state[_edit_status_key] in LEAD_STATUS_OPTIONS
-                        else 0
-                    )
-                    leadStatusLabel = st.selectbox(
-                        "Lead status",
-                        LEAD_STATUS_OPTIONS,
-                        index=status_index,
-                        key=_edit_status_key,
-                    )
+                    current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+                    status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
+                    leadStatusLabel = st.selectbox("Lead status", LEAD_STATUS_OPTIONS, index=status_index)
 
                     alloc_opts = allocated_to_suggestions()
                     current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
@@ -1716,6 +1700,27 @@ if page == "Leads":
                     value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
                 )
 
+                is_closed_lead = leadStatusLabel == "Closed"
+                net_premium = ""
+                if is_closed_lead:
+                    net_premium = st.text_input(
+                        "Net Premium",
+                        value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                    )
+                uploaded_policy_copy = None
+                if is_closed_lead:
+                    uploaded_policy_copy = st.file_uploader(
+                        "Policy Copy",
+                        type=["pdf", "png", "jpg", "jpeg", "webp"],
+                        help="Upload the issued policy copy for closed leads.",
+                        key=f"policy_copy_upload_{lead.get('leadId')}",
+                    )
+                    if policy_copy_present(lead):
+                        existing_policy = lead.get("policyCopy") or {}
+                        st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
+                else:
+                    st.caption("Policy Copy upload is available only when the lead status is Closed.")
+
                 comment_edit = st.text_area(
                     "Comments (optional)",
                     value=existing_comment_default,
@@ -1726,28 +1731,6 @@ if page == "Leads":
 
                 st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
                 save = st.form_submit_button("Save changes")
-
-            # ---- Closed-only fields outside the form so they appear/hide immediately ----
-            is_closed_edit = st.session_state[_edit_status_key] == "Closed"
-            net_premium = ""
-            uploaded_policy_copy = None
-            if is_closed_edit:
-                net_premium = st.text_input(
-                    "Net Premium",
-                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
-                    key=f"edit_net_premium_{lead.get('leadId')}",
-                )
-                uploaded_policy_copy = st.file_uploader(
-                    "Policy Copy",
-                    type=["pdf", "png", "jpg", "jpeg", "webp"],
-                    help="Upload the issued policy copy for closed leads.",
-                    key=f"policy_copy_upload_{lead.get('leadId')}",
-                )
-                if policy_copy_present(lead):
-                    existing_policy = lead.get("policyCopy") or {}
-                    st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
-            else:
-                st.caption("Net Premium and Policy Copy are available only when Lead status is Closed.")
 
             if save:
                 # ---- Money parsing ----
@@ -1901,10 +1884,6 @@ elif page == "Create Lead":
     product_opts = product_suggestions()
     alloc_opts = allocated_to_suggestions()
 
-    # ---- Live status key: outside the form so conditional fields react on change ----
-    if "create_lead_status" not in st.session_state:
-        st.session_state["create_lead_status"] = LEAD_STATUS_OPTIONS[0]
-
     with st.form("create_lead_form"):
         c1, c2 = st.columns(2)
 
@@ -1917,14 +1896,24 @@ elif page == "Create Lead":
 
         with c2:
             productType = st.selectbox("Product type", ["(none)"] + product_opts)
-            leadStatus = st.selectbox(
-                "Lead status",
-                LEAD_STATUS_OPTIONS,
-                key="create_lead_status",
-            )
+            leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
             allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
+            net_premium = ""
+            if leadStatus == "Closed":
+                net_premium = st.text_input("Net Premium", value="")
+
+            uploaded_policy_copy = None
+            if leadStatus == "Closed":
+                uploaded_policy_copy = st.file_uploader(
+                    "Policy Copy",
+                    type=["pdf", "png", "jpg", "jpeg", "webp"],
+                    help="Upload the issued policy copy for closed leads.",
+                    key="create_policy_copy_upload",
+                )
+            else:
+                st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
         comment = st.text_area(
             "Comments (optional)",
@@ -1934,21 +1923,6 @@ elif page == "Create Lead":
         )
 
         submit_new_lead = st.form_submit_button("Create lead", use_container_width=True)
-
-    # ---- Closed-only fields outside the form so they appear/hide immediately ----
-    is_closed_create = st.session_state["create_lead_status"] == "Closed"
-    net_premium = ""
-    uploaded_policy_copy = None
-    if is_closed_create:
-        net_premium = st.text_input("Net Premium", value="", key="create_net_premium")
-        uploaded_policy_copy = st.file_uploader(
-            "Policy Copy",
-            type=["pdf", "png", "jpg", "jpeg", "webp"],
-            help="Upload the issued policy copy for closed leads.",
-            key="create_policy_copy_upload",
-        )
-    else:
-        st.caption("Net Premium and Policy Copy are available only when Lead status is Closed.")
 
     if submit_new_lead:
         brokerage_val: Any = brokerage.strip()
