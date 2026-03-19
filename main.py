@@ -267,7 +267,7 @@ def denormalize_lead_status(value: Optional[str]) -> str:
 # THEME / UI
 # -----------------------
 def load_app_styles() -> None:
-    styles_path = APP_DIR / "streamlit" / "styles.css"
+    styles_path = APP_DIR / ".streamlit" / "styles.css"
     css = styles_path.read_text(encoding="utf-8")
     if hasattr(st, "html"):
         st.html(f"<style>{css}</style>")
@@ -276,6 +276,7 @@ def load_app_styles() -> None:
 
 
 load_app_styles()
+
 
 # -----------------------
 # UI helpers
@@ -347,7 +348,7 @@ def parse_money(value: Any) -> Optional[float]:
         return None
     s = re.sub(r"[^0-9.\-]", "", s)
     if not s or s in {"-", ".", "-."}:
-        return None
+	        return None
     try:
         return float(s)
     except Exception:
@@ -698,9 +699,7 @@ def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     else:
         end_ist = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=IST)
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
-
-
-# -----------------------
+	# -----------------------
 # LeadId helpers (prefix SL)
 # -----------------------
 def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
@@ -979,7 +978,53 @@ def filters_are_active(filters: dict) -> bool:
     )
 
 
-def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
+LEAD_STATUS_BADGE_STYLES: dict[str, dict[str, str]] = {
+    "fresh": {"text": "#1d4ed8", "bg": "#dbeafe", "border": "#93c5fd"},
+    "allocated": {"text": "#7c3aed", "bg": "#ede9fe", "border": "#c4b5fd"},
+    "interested": {"text": "#047857", "bg": "#d1fae5", "border": "#6ee7b7"},
+    "lost": {"text": "#dc2626", "bg": "#fee2e2", "border": "#fca5a5"},
+    "closed": {"text": "#0f766e", "bg": "#ccfbf1", "border": "#5eead4"},
+}
+
+
+def lead_status_badge_style(value: object) -> str:
+    normalized = normalize_lead_status(str(value or ""))
+    palette = LEAD_STATUS_BADGE_STYLES.get(
+        normalized,
+        {"text": "#475569", "bg": "#e2e8f0", "border": "#cbd5e1"},
+    )
+    return (
+        f"background-color: {palette['bg']}; "
+        f"color: {palette['text']}; "
+        f"border: 1px solid {palette['border']}; "
+        "border-radius: 999px; "
+        "font-weight: 700; "
+        "text-align: center; "
+        "padding: 0.45rem 0.75rem;"
+    )
+
+
+def style_leads_table(df_table: pd.DataFrame) -> Any:
+    styler = df_table.style
+    styler = styler.set_properties(
+        **{
+            "background-color": "#ffffff",
+            "color": "#334e68",
+            "border-bottom": "1px solid #e5e7eb",
+            "font-size": "0.95rem",
+        }
+    )
+    styler = styler.map(
+        lambda _value: "background-color: #f8fbff;",
+        subset=pd.IndexSlice[:, df_table.columns],
+    )
+    styler = styler.map(lead_status_badge_style, subset=["Status"])
+    styler = styler.set_properties(
+        subset=["Number", "Status", "Brokerage Received"],
+        **{"text-align": "center"},
+    )
+    return styler
+	def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
     df_table = pd.DataFrame([
         {
             "Number": idx + 1,
@@ -1034,7 +1079,7 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
     )
 
     selection_event = st.dataframe(
-        df_table,
+        style_leads_table(df_table),
         use_container_width=True,
         hide_index=True,
         height=390,
@@ -1255,8 +1300,7 @@ with st.sidebar:
         if range_start > range_end:
             range_start, range_end = range_end, range_start
     card_close()
-
-    if st.session_state.get("is_super_admin") is True:
+	    if st.session_state.get("is_super_admin") is True:
         card_open("User Management", "lb-navy", "#2d448d", subtitle="Add users, manage passwords, and reveal current user credentials")
 
         if "generated_password_create" not in st.session_state:
@@ -1546,8 +1590,7 @@ if page == "Leads":
                     "netPremium": net_premium_val,
                     "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
                 }
-
-                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
+				                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
                 previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
                 next_alloc = (allocatedToDisplayName or "").strip() or None
                 allocation_push = None
