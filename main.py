@@ -5,8 +5,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 import base64
 import hmac
+import importlib
 import hashlib
-import json
+from io import BytesIO
 import os
 import re
 import secrets
@@ -15,7 +16,6 @@ import string
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
@@ -38,6 +38,10 @@ COLL_LEADS = "leads"
 COLL_USERS = "leadbox-users"
 SECRET_KEY_LEADS = "mongo_uri_leads"  # Streamlit secrets key
 LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedAt=1771587668127"
+
+PDFIUM_AVAILABLE = importlib.util.find_spec("pypdfium2") is not None
+pdfium = importlib.import_module("pypdfium2") if PDFIUM_AVAILABLE else None
+
 
 LEAD_ID_PREFIX = "SL"
 SUPER_ADMIN_USERNAME = "sallead"
@@ -620,6 +624,22 @@ def policy_copy_present(lead: dict) -> bool:
     return bool(isinstance(policy_copy, dict) and str(policy_copy.get("data") or "").strip())
 
 
+def render_pdf_preview_image(file_bytes: bytes, file_name: str) -> bool:
+    if not PDFIUM_AVAILABLE or pdfium is None:
+        return False
+
+    try:
+        pdf = pdfium.PdfDocument(file_bytes)
+        page = pdf[0]
+        bitmap = page.render(scale=1.5).to_pil()
+        buffer = BytesIO()
+        bitmap.save(buffer, format="WEBP", quality=90)
+        st.image(buffer.getvalue(), caption=f"{file_name} • preview", use_container_width=True)
+        return True
+    except Exception:
+        return False
+
+
 def dedupe_notes(notes: list[dict]) -> list[dict]:
     deduped: list[dict] = []
     seen: set[tuple[str, str]] = set()
@@ -656,33 +676,9 @@ def show_policy_copy_dialog(lead: dict) -> None:
 
     file_bytes = base64.b64decode(encoded)
     if mime_type == "application/pdf":
-        encoded_js = json.dumps(encoded)
-        file_name_js = json.dumps(file_name)
-        components.html(
-            f"""
-            <div id="policy-copy-pdf-viewer" style="height:640px;"></div>
-            <script>
-              const encoded = {encoded_js};
-              const fileName = {file_name_js};
-              const binary = atob(encoded);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i += 1) {{
-                bytes[i] = binary.charCodeAt(i);
-              }}
-              const blob = new Blob([bytes], {{ type: "application/pdf" }});
-              const blobUrl = URL.createObjectURL(blob);
-              const container = document.getElementById("policy-copy-pdf-viewer");
-              container.innerHTML = `
-                <iframe
-                  title="${{fileName}}"
-                  src="${{blobUrl}}#toolbar=1&navpanes=0&scrollbar=1"
-                  style="width:100%;height:640px;border:0;border-radius:12px;"
-                ></iframe>
-              `;
-            </script>
-            """,
-            height=640,
-        )
+        if not render_pdf_preview_image(file_bytes, file_name):
+            st.pdf(file_bytes, width="stretch", height=640)
+            st.caption("Preview fallback: native PDF viewer shown because image conversion was unavailable.")
     elif mime_type.startswith("image/"):
         st.image(file_bytes, caption=file_name, use_container_width=True)
     else:
@@ -1703,12 +1699,14 @@ if page == "Leads":
                     "Brokerage received",
                     value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
                 )
-                net_premium = st.text_input(
-                    "Net Premium",
-                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
-                )
 
                 is_closed_lead = leadStatusLabel == "Closed"
+                net_premium = ""
+                if is_closed_lead:
+                    net_premium = st.text_input(
+                        "Net Premium",
+                        value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                    )
                 uploaded_policy_copy = None
                 if is_closed_lead:
                     uploaded_policy_copy = st.file_uploader(
@@ -1902,7 +1900,9 @@ elif page == "Create Lead":
             allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
             allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
-            net_premium = st.text_input("Net Premium", value="")
+            net_premium = ""
+            if leadStatus == "Closed":
+                net_premium = st.text_input("Net Premium", value="")
 
             uploaded_policy_copy = None
             if leadStatus == "Closed":
