@@ -267,7 +267,7 @@ def denormalize_lead_status(value: Optional[str]) -> str:
 # THEME / UI
 # -----------------------
 def load_app_styles() -> None:
-    styles_path = APP_DIR / ".streamlit" / "styles.css"
+    styles_path = APP_DIR / "streamlit" / "styles.css"
     css = styles_path.read_text(encoding="utf-8")
     if hasattr(st, "html"):
         st.html(f"<style>{css}</style>")
