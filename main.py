@@ -558,7 +558,7 @@ def encode_uploaded_file(uploaded_file: Any) -> Optional[dict]:
         return None
 
     data = uploaded_file.getvalue()
-        if not data:
+    if not data:
         return None
 
     mime_type = str(getattr(uploaded_file, "type", "") or "application/octet-stream").strip() or "application/octet-stream"
@@ -1091,7 +1091,9 @@ def first_month_in_db() -> datetime:
 
     now = datetime.now(IST)
     return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
-    def month_series_counts_df() -> pd.DataFrame:
+
+
+def month_series_counts_df() -> pd.DataFrame:
     col = leads_col()
 
     start_m = first_month_in_db()
