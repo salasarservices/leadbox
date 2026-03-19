@@ -980,10 +980,10 @@ def filters_are_active(filters: dict) -> bool:
 
 LEAD_STATUS_BADGE_STYLES: dict[str, dict[str, str]] = {
     "fresh": {"text": "#216DBF", "bg": "#dbeafe", "border": "#93c5fd"},
-    "allocated": {"text": "#216DBF", "bg": "#ede9fe", "border": "#c4b5fd"},
-    "interested": {"text": "#216DBF", "bg": "#27E0F5", "border": "#6ee7b7"},
-    "lost": {"text": "#216DBF", "bg": "#fee2e2", "border": "#fca5a5"},
-    "closed": {"text": "#216DBF", "bg": "#F2A757", "border": "#5eead4"},
+    "allocated": {"text": "#1E40AF", "bg": "#DBEAFE", "border": "#c4b5fd"},
+    "interested": {"text": "#166534", "bg": "#DCFCE7", "border": "#6ee7b7"},
+    "lost": {"text": "#991B1B", "bg": "#FEE2E2", "border": "#fca5a5"},
+    "closed": {"text": "#14532D", "bg": "#BBF7D0", "border": "#5eead4"},
 }
 
 
