@@ -276,7 +276,7 @@ st.markdown(
   --card:#FFFFFF;
 
   --pastel-navy:#EEF2FF;
-  --pastel-lime:#F3FAE6;
+    --pastel-lime:#F3FAE6;
   --pastel-cyan:#E6F8FF;
 
   --text:#0f172a;
@@ -544,8 +544,8 @@ def db_status_pill(ok: bool, detail: str = ""):
 <div class="db-pill">
   <div class="db-dot" style="background:{color};"></div>
   <div>
-    <div class="db-text">{text}</div>
-    <div class="db-sub">{sub}</div>
+      <div class="db-text">{text}</div>
+      <div class="db-sub">{sub}</div>
   </div>
 </div>
 """,
@@ -558,7 +558,7 @@ def encode_uploaded_file(uploaded_file: Any) -> Optional[dict]:
         return None
 
     data = uploaded_file.getvalue()
-    if not data:
+        if not data:
         return None
 
     mime_type = str(getattr(uploaded_file, "type", "") or "application/octet-stream").strip() or "application/octet-stream"
@@ -1091,9 +1091,7 @@ def first_month_in_db() -> datetime:
 
     now = datetime.now(IST)
     return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
-
-
-def month_series_counts_df() -> pd.DataFrame:
+    def month_series_counts_df() -> pd.DataFrame:
     col = leads_col()
 
     start_m = first_month_in_db()

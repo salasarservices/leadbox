@@ -3,5 +3,4 @@ pymongo>=4.6,<5
 dnspython>=2.4,<3
 pandas>=2.2,<3
 plotly>=5.18,<6
-
 pypdfium2>=4.30,<5
