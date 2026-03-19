@@ -348,7 +348,7 @@ def parse_money(value: Any) -> Optional[float]:
         return None
     s = re.sub(r"[^0-9.\-]", "", s)
     if not s or s in {"-", ".", "-."}:
-	        return None
+        return None
     try:
         return float(s)
     except Exception:
@@ -699,7 +699,7 @@ def month_bounds_utc(year: int, month: int) -> Tuple[datetime, datetime]:
     else:
         end_ist = datetime(year, month + 1, 1, 0, 0, 0, tzinfo=IST)
     return start_ist.astimezone(timezone.utc), end_ist.astimezone(timezone.utc)
-	# -----------------------
+# -----------------------
 # LeadId helpers (prefix SL)
 # -----------------------
 def make_lead_id(serial: int, lead_date_ist: datetime) -> str:
@@ -1024,7 +1024,7 @@ def style_leads_table(df_table: pd.DataFrame) -> Any:
         **{"text-align": "center"},
     )
     return styler
-	def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
+def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFrame]:
     df_table = pd.DataFrame([
         {
             "Number": idx + 1,
@@ -1300,7 +1300,7 @@ with st.sidebar:
         if range_start > range_end:
             range_start, range_end = range_end, range_start
     card_close()
-	    if st.session_state.get("is_super_admin") is True:
+    if st.session_state.get("is_super_admin") is True:
         card_open("User Management", "lb-navy", "#2d448d", subtitle="Add users, manage passwords, and reveal current user credentials")
 
         if "generated_password_create" not in st.session_state:
@@ -1590,7 +1590,7 @@ if page == "Leads":
                     "netPremium": net_premium_val,
                     "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
                 }
-				                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
+                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
                 previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
                 next_alloc = (allocatedToDisplayName or "").strip() or None
                 allocation_push = None
