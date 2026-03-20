@@ -123,9 +123,112 @@ def check_db_user_login(username: str, password: str) -> bool:
 
 
 def logout_user(reason: str = "You have been logged out.") -> None:
+    # Clear localStorage token via components
+    st_components.html(
+        "<script>try{localStorage.removeItem('lb_session');}catch(e){}</script>",
+        height=0,
+    )
     st.session_state.clear()
     st.session_state["logout_notice"] = reason
     st.rerun()
+
+
+def restore_login_from_storage() -> None:
+    """Inject a script that reads localStorage and posts session data back via query params."""
+    if st.session_state.get("authenticated") is True:
+        return
+    if st.session_state.get("_storage_checked"):
+        return
+    st.session_state["_storage_checked"] = True
+    token = st.query_params.get("_lb_token")
+    user = st.query_params.get("_lb_user")
+    admin = st.query_params.get("_lb_admin")
+    if token == "1" and user:
+        st.session_state["authenticated"] = True
+        st.session_state["logged_in_user"] = user
+        st.session_state["is_super_admin"] = admin == "1"
+        st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
+        st.query_params.clear()
+        st.rerun()
+    else:
+        st_components.html("""
+<script>
+(function() {
+  try {
+    var s = localStorage.getItem('lb_session');
+    if (!s) return;
+    var d = JSON.parse(s);
+    if (!d.user) return;
+    var base = window.parent.location.href.split('?')[0];
+    window.parent.location.href = base + '?_lb_token=1&_lb_user=' + encodeURIComponent(d.user) + '&_lb_admin=' + (d.admin ? '1' : '0');
+  } catch(e) {}
+})();
+</script>
+""", height=0)
+
+
+def persist_login_to_storage() -> None:
+    """Save current session to localStorage so it survives page refresh."""
+    if st.session_state.get("authenticated") is not True:
+        return
+    user = st.session_state.get("logged_in_user", "")
+    admin = "true" if st.session_state.get("is_super_admin") else "false"
+    st_components.html(f"""
+<script>
+(function() {{
+  try {{
+    localStorage.setItem('lb_session', JSON.stringify({{user: '{user}', admin: {admin}}}));
+  }} catch(e) {{}}
+}})();
+</script>
+""", height=0)
+
+
+_LOADER_HTML = """
+<div id="lb-db-loader" style="
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(15,23,42,0.45);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:99999;backdrop-filter:blur(2px);">
+  <div class="loader"></div>
+  <div style="margin-top:18px;color:#fff;font-size:0.85rem;font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">
+    {label}
+  </div>
+</div>
+<style>
+.loader {{
+  width: 32px;
+  height: 72px;
+  display: inline-block;
+  left: 5px;
+  position: relative;
+  border: 2px solid #FFF;
+  box-sizing: border-box;
+  animation: animloader 2s linear infinite alternate;
+  color: #FF3D00;
+  border-radius: 0 0 4px 4px;
+  transform: perspective(140px) rotateX(-45deg);
+}}
+@keyframes animloader {{
+  0%   {{ box-shadow: 0 0  inset; }}
+  100% {{ box-shadow: 0 -70px inset; }}
+}}
+</style>
+"""
+
+
+from contextlib import contextmanager
+
+@contextmanager
+def db_loader(label: str = "Please wait..."):
+    """Show custom CSS loader overlay while a DB operation runs, then clear it."""
+    placeholder = st.empty()
+    placeholder.markdown(_LOADER_HTML.format(label=label), unsafe_allow_html=True)
+    try:
+        yield
+    finally:
+        placeholder.empty()
 
 
 def track_session_activity() -> None:
@@ -195,11 +298,12 @@ def login_gate() -> None:
     st.stop()
 
 
+restore_login_from_storage()
 login_gate()
+persist_login_to_storage()
 
 
-# -----------------------
-# Domain choices
+
 # -----------------------
 LEAD_STATUS_OPTIONS = ["Fresh", "Allocated", "Interested", "Lost", "Closed"]
 
@@ -1448,7 +1552,8 @@ filters = {
 # Pages
 # -----------------------
 if page == "Leads":
-    leads = fetch_leads(filters)
+    with db_loader("Fetching leads..."):
+        leads = fetch_leads(filters)
     is_filtered = filters_are_active(filters)
 
     kpis = compute_kpis_from_docs(leads)
@@ -1701,14 +1806,15 @@ if page == "Leads":
                         }
                     }
 
-                try:
-                    update_lead(lead_oid, updates, push_ops=allocation_push)
-                except DuplicateKeyError:
-                    st.error("Lead ID collision occurred. Try saving again.")
-                    st.stop()
+                with db_loader("Saving lead..."):
+                    try:
+                        update_lead(lead_oid, updates, push_ops=allocation_push)
+                    except DuplicateKeyError:
+                        st.error("Lead ID collision occurred. Try saving again.")
+                        st.stop()
 
-                if (comment_edit or "").strip() and (comment_edit or "").strip() != existing_comment_default.strip():
-                    add_note(lead_oid, comment_edit.strip(), created_by=current_username())
+                    if (comment_edit or "").strip() and (comment_edit or "").strip() != existing_comment_default.strip():
+                        add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
@@ -1721,7 +1827,8 @@ if page == "Leads":
                 st.markdown("---")
                 st.caption("Super admin only")
                 if st.button("Delete this lead", key=f"delete_lead_{lead.get('leadId')}"):
-                    delete_lead(lead_oid)
+                    with db_loader("Deleting lead..."):
+                        delete_lead(lead_oid)
                     st.session_state.pop("selected_lead_id", None)
                     st.success("Lead deleted.")
                     st.rerun()
@@ -1754,7 +1861,8 @@ if page == "Leads":
                     st.markdown(f"**{meta}**")
                     st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
                     if st.button("Delete comment", key=f"del_note_{selected_lead.get('leadId')}_{idx}"):
-                        delete_note(selected_lead["_id"], note)
+                        with db_loader("Deleting comment..."):
+                            delete_note(selected_lead["_id"], note)
                         st.success("Comment deleted.")
                         st.rerun()
                     if idx < len(notes_sorted) - 1:
@@ -1868,9 +1976,9 @@ elif page == "Create Lead":
             "policyCopy": policy_copy_doc,
             "comment": comment.strip() or None,
         }
-        new_id = create_lead(create_payload)
-
-        created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
+        with db_loader("Creating lead..."):
+            new_id = create_lead(create_payload)
+            created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
         st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
 
     card_close()
