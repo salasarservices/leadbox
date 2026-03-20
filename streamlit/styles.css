@@ -135,7 +135,7 @@ footer { visibility: hidden; }
 -sub{
   margin-top: 4px;
   font-size: 0.78rem;
-  color: var(--muted);
+  color: var(--kpi-num);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 900;
