@@ -79,8 +79,8 @@
 .lb-conversion{ background: var(--kpi-conversion); }
 
 .stButton>button{
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: 0px;
+  border: 0px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 400;
   background-color: #e3f577;
@@ -177,7 +177,7 @@ footer { visibility: hidden; }
 }
 
 /* Scrollable dataframe container */
-.lb-table-wrap{
+.lb--wrap{
   border: 1px solid rgba(15,23,42,0.08);
   border-radius: 14px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
@@ -224,12 +224,11 @@ footer { visibility: hidden; }
 
 /* Filtered leads table header styling */
 div[data-testid="stDataFrame"] [role="columnheader"] {
-  background: #42A6FF !important;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
 }
 
 div[data-testid="stDataFrame"] [role="columnheader"] * {
   font-weight: 800 !important;
-  color: #ffffff !important;
   text-align: center !important;
   justify-content: center !important;
 }
