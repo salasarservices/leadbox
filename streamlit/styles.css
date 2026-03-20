@@ -7,7 +7,7 @@
   --app-font:'Open Sans', sans-serif;
 
   --bg:#F7F9FC;
-  --card:#FFFFFF;
+  --card:#fff;
 
   --pastel-navy:#448AFF;
   --pastel-lime:#11C15B;
@@ -16,7 +16,7 @@
   --text:#0f172a;
   --muted:#64748b;
   --kpi-num:#fff;
-  --border: rgba(15, 23, 42, 0.08);
+  --border:#fff;
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
@@ -66,9 +66,9 @@
   margin-top: -2px;
 }
 
-.lb-navy{ background: linear-gradient(180deg, var(--pastel-navy), #fff); }
-.lb-lime{ background: linear-gradient(180deg, var(--pastel-lime), #fff); }
-.lb-cyan{ background: linear-gradient(180deg, var(--pastel-cyan), #fff); }
+.lb-navy{ background: linear-gradient(180deg, var(--pastel-navy)); }
+.lb-lime{ background: linear-gradient(180deg, var(--pastel-lime)); }
+.lb-cyan{ background: linear-gradient(180deg, var(--pastel-cyan)); }
 
 .stButton>button{
   border-radius: 10px;
