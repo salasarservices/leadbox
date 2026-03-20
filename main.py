@@ -216,18 +216,7 @@ def persist_login_to_storage() -> None:
 """, height=0)
 
 
-_LOADER_HTML = """
-<div id="lb-db-loader" style="
-  position:fixed;top:0;left:0;width:100%;height:100%;
-  background:rgba(15,23,42,0.45);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  z-index:99999;backdrop-filter:blur(2px);">
-  <div class="loader"></div>
-  <div style="margin-top:18px;color:#fff;font-size:0.85rem;font-weight:700;
-    letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">
-    {label}
-  </div>
-</div>
+_LOADER_CSS = """
 <style>
 .loader {
   width: 24px;
@@ -244,8 +233,8 @@ _LOADER_HTML = """
   background-repeat: no-repeat;
   box-sizing: border-box;
   animation: animloader 6s linear infinite;
-}}
-.loader::after {{
+}
+.loader::after {
   content: '';
   box-sizing: border-box;
   top: -6px;
@@ -256,8 +245,8 @@ _LOADER_HTML = """
   border-radius: 50%;
   width: 28px;
   height: 6px;
-}}
-.loader::before {{
+}
+.loader::before {
   content: '';
   box-sizing: border-box;
   left: 0;
@@ -267,20 +256,34 @@ _LOADER_HTML = """
   width: 6px;
   height: 6px;
   animation: animloader1 6s linear infinite;
-}}
-@keyframes animloader {{
-  0%   {{ background-position: 0px 80px; }}
-  100% {{ background-position: 0px 0px; }}
-}}
-@keyframes animloader1 {{
-  0%   {{ box-shadow: 4px -10px rgba(255,255,255,0), 6px 0px rgba(255,255,255,0), 8px -15px rgba(255,255,255,0), 12px 0px rgba(255,255,255,0); }}
-  20%  {{ box-shadow: 4px -20px rgba(255,255,255,0), 8px -10px rgba(255,255,255,0), 10px -30px rgba(255,255,255,0.5), 15px -5px rgba(255,255,255,0); }}
-  40%  {{ box-shadow: 2px -40px rgba(255,255,255,0.5), 8px -30px rgba(255,255,255,0.4), 8px -60px rgba(255,255,255,0.5), 12px -15px rgba(255,255,255,0.5); }}
-  60%  {{ box-shadow: 4px -60px rgba(255,255,255,0.5), 6px -50px rgba(255,255,255,0.4), 10px -90px rgba(255,255,255,0.5), 15px -25px rgba(255,255,255,0.5); }}
-  80%  {{ box-shadow: 2px -80px rgba(255,255,255,0.5), 4px -70px rgba(255,255,255,0.4), 8px -120px rgba(255,255,255,0), 12px -35px rgba(255,255,255,0.5); }}
-  100% {{ box-shadow: 4px -100px rgba(255,255,255,0), 8px -90px rgba(255,255,255,0), 10px -120px rgba(255,255,255,0), 15px -45px rgba(255,255,255,0); }}
-}}
+}
+@keyframes animloader {
+  0%   { background-position: 0px 80px; }
+  100% { background-position: 0px 0px; }
+}
+@keyframes animloader1 {
+  0%   { box-shadow: 4px -10px rgba(255,255,255,0), 6px 0px rgba(255,255,255,0), 8px -15px rgba(255,255,255,0), 12px 0px rgba(255,255,255,0); }
+  20%  { box-shadow: 4px -20px rgba(255,255,255,0), 8px -10px rgba(255,255,255,0), 10px -30px rgba(255,255,255,0.5), 15px -5px rgba(255,255,255,0); }
+  40%  { box-shadow: 2px -40px rgba(255,255,255,0.5), 8px -30px rgba(255,255,255,0.4), 8px -60px rgba(255,255,255,0.5), 12px -15px rgba(255,255,255,0.5); }
+  60%  { box-shadow: 4px -60px rgba(255,255,255,0.5), 6px -50px rgba(255,255,255,0.4), 10px -90px rgba(255,255,255,0.5), 15px -25px rgba(255,255,255,0.5); }
+  80%  { box-shadow: 2px -80px rgba(255,255,255,0.5), 4px -70px rgba(255,255,255,0.4), 8px -120px rgba(255,255,255,0), 12px -35px rgba(255,255,255,0.5); }
+  100% { box-shadow: 4px -100px rgba(255,255,255,0), 8px -90px rgba(255,255,255,0), 10px -120px rgba(255,255,255,0), 15px -45px rgba(255,255,255,0); }
+}
 </style>
+"""
+
+_LOADER_HTML = """
+<div id="lb-db-loader" style="
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:rgba(15,23,42,0.45);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:99999;backdrop-filter:blur(2px);">
+  <div class="loader"></div>
+  <div style="margin-top:18px;color:#fff;font-size:0.85rem;font-weight:700;
+    letter-spacing:0.08em;text-transform:uppercase;opacity:0.85;">
+    {label}
+  </div>
+</div>
 """
 
 
@@ -289,6 +292,7 @@ from contextlib import contextmanager
 @contextmanager
 def db_loader(label: str = "Please wait..."):
     """Show custom CSS loader overlay while a DB operation runs, then clear it."""
+    st.markdown(_LOADER_CSS, unsafe_allow_html=True)
     placeholder = st.empty()
     placeholder.markdown(_LOADER_HTML.format(label=label), unsafe_allow_html=True)
     try:
