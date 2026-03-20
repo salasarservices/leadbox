@@ -62,7 +62,6 @@
 .lb-subtitle{
   color: var(--title-text);
   font-size: 0.88rem;
-  text-transform: uppercase;
   margin-top: -2px;
 }
 
