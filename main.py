@@ -512,7 +512,7 @@ def allocation_chain_text(lead: dict) -> str:
 def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     return f"""
-<div class="kpi-row">
+<div class="kpi-row" style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
   <div class="kpi-wrap">
     <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
       <div class="kpi-inner">
@@ -534,9 +534,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, #FFF1F2, #fff);">
+    <div class="kpi" style="background: #FF5252;">
       <div class="kpi-inner">
-        <div class="kpi-number" style="color:#be123c;">{not_interested}</div>
+        <div class="kpi-number">{not_interested}</div>
         <div class="kpi-sub">Lost</div>
       </div>
     </div>
@@ -554,9 +554,9 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, #FFF7ED, #fff);">
+    <div class="kpi" style="background: #536DFE;">
       <div class="kpi-inner">
-        <div class="kpi-number" style="color:#9a3412;">{brok}</div>
+        <div class="kpi-number">{brok}</div>
         <div class="kpi-sub">Total Brokerage</div>
       </div>
     </div>
