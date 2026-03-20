@@ -513,65 +513,59 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     brok = format_inr_compact(total_brokerage)
     conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
     return f"""
-<div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: var(--pastel-navy);">
-      <div class="kpi-inner">
-        <div class="kpi-number navy">{total}</div>
-        <div class="kpi-sub">Total Leads</div>
+<div class="kpi-row" style="display:flex;gap:12px;padding:10px 2px 6px 2px;align-items:flex-start;">
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:var(--pastel-navy);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number navy" style="font-size:1.9rem;font-weight:900;color:#fff;">{total}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Total Leads</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: var(--pastel-lime);">
-      <div class="kpi-inner">
-        <div class="kpi-number lime">{interested}</div>
-        <div class="kpi-sub">Interested</div>
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:var(--pastel-lime);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number lime" style="font-size:1.9rem;font-weight:900;color:#fff;">{interested}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Interested</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: #FF5252;">
-      <div class="kpi-inner">
-        <div class="kpi-number">{not_interested}</div>
-        <div class="kpi-sub">Lost</div>
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:#FF5252;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{not_interested}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Lost</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: var(--pastel-cyan);">
-      <div class="kpi-inner">
-        <div class="kpi-number cyan">{closed}</div>
-        <div class="kpi-sub">Closed</div>
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:var(--pastel-cyan);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number cyan" style="font-size:1.9rem;font-weight:900;color:#fff;">{closed}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Closed</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: #536DFE;">
-      <div class="kpi-inner">
-        <div class="kpi-number">{brok}</div>
-        <div class="kpi-sub">Total Brokerage</div>
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:#536DFE;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{brok}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Total Brokerage</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 
-  <div class="kpi-wrap">
-    <div class="kpi" style="background: #7C4DFF;">
-      <div class="kpi-inner">
-        <div class="kpi-number">{conversion}</div>
-        <div class="kpi-sub">Conversion Rate</div>
+  <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
+    <div class="kpi" style="background:#7C4DFF;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
+      <div class="kpi-inner" style="text-align:center;padding:8px;">
+        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{conversion}</div>
+        <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Conversion Rate</div>
       </div>
     </div>
-    <div class="kpi-title-below"></div>
   </div>
 </div>
 """
