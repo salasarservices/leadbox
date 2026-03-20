@@ -123,34 +123,46 @@ def check_db_user_login(username: str, password: str) -> bool:
 
 
 def logout_user(reason: str = "You have been logged out.") -> None:
-    # Clear localStorage token via components
-    st_components.html(
-        "<script>try{localStorage.removeItem('lb_session');}catch(e){}</script>",
-        height=0,
-    )
     st.session_state.clear()
     st.session_state["logout_notice"] = reason
+    st.session_state["_clear_storage"] = True
     st.rerun()
 
 
 def restore_login_from_storage() -> None:
-    """Inject a script that reads localStorage and posts session data back via query params."""
+    """Restore session from query params written by localStorage JS bridge."""
+    # If already authenticated, nothing to do
     if st.session_state.get("authenticated") is True:
         return
-    if st.session_state.get("_storage_checked"):
-        return
-    st.session_state["_storage_checked"] = True
-    token = st.query_params.get("_lb_token")
-    user = st.query_params.get("_lb_user")
-    admin = st.query_params.get("_lb_admin")
-    if token == "1" and user:
+
+    # Step 2: query params have been set by the JS bridge — restore session
+    user = st.query_params.get("_lb_user", "")
+    admin = st.query_params.get("_lb_admin", "0")
+    ts = st.query_params.get("_lb_ts", "")
+
+    if user:
+        # Validate inactivity before restoring
+        try:
+            last_ts = float(ts)
+            elapsed = datetime.now(timezone.utc).timestamp() - last_ts
+            if elapsed >= INACTIVITY_TIMEOUT_SECONDS:
+                st.query_params.clear()
+                return
+        except (ValueError, TypeError):
+            st.query_params.clear()
+            return
+
         st.session_state["authenticated"] = True
         st.session_state["logged_in_user"] = user
         st.session_state["is_super_admin"] = admin == "1"
         st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
         st.query_params.clear()
-        st.rerun()
-    else:
+        return
+
+    # Step 1: not authenticated, not from params — inject JS bridge to read localStorage
+    # and set query params (no redirect, uses history.replaceState)
+    if not st.session_state.get("_storage_checked"):
+        st.session_state["_storage_checked"] = True
         st_components.html("""
 <script>
 (function() {
@@ -159,8 +171,14 @@ def restore_login_from_storage() -> None:
     if (!s) return;
     var d = JSON.parse(s);
     if (!d.user) return;
-    var base = window.parent.location.href.split('?')[0];
-    window.parent.location.href = base + '?_lb_token=1&_lb_user=' + encodeURIComponent(d.user) + '&_lb_admin=' + (d.admin ? '1' : '0');
+    var ts = d.ts || '0';
+    var elapsed = (Date.now() / 1000) - parseFloat(ts);
+    if (elapsed >= 1800) { localStorage.removeItem('lb_session'); return; }
+    var url = new URL(window.parent.location.href);
+    url.searchParams.set('_lb_user', d.user);
+    url.searchParams.set('_lb_admin', d.admin ? '1' : '0');
+    url.searchParams.set('_lb_ts', ts);
+    window.parent.location.href = url.toString();
   } catch(e) {}
 })();
 </script>
@@ -168,16 +186,30 @@ def restore_login_from_storage() -> None:
 
 
 def persist_login_to_storage() -> None:
-    """Save current session to localStorage so it survives page refresh."""
+    """Save session to localStorage on every authenticated render."""
+    # Clear storage on logout
+    if st.session_state.pop("_clear_storage", False):
+        st_components.html(
+            "<script>try{localStorage.removeItem('lb_session');}catch(e){}</script>",
+            height=0,
+        )
+        return
+
     if st.session_state.get("authenticated") is not True:
         return
+
     user = st.session_state.get("logged_in_user", "")
     admin = "true" if st.session_state.get("is_super_admin") else "false"
+    ts = str(st.session_state.get("last_activity_ts", datetime.now(timezone.utc).timestamp()))
     st_components.html(f"""
 <script>
 (function() {{
   try {{
-    localStorage.setItem('lb_session', JSON.stringify({{user: '{user}', admin: {admin}}}));
+    localStorage.setItem('lb_session', JSON.stringify({{
+      user: '{user}',
+      admin: {admin},
+      ts: '{ts}'
+    }}));
   }} catch(e) {{}}
 }})();
 </script>
