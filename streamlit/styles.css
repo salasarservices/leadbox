@@ -83,6 +83,7 @@
   border: 1px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 650;
+  background-color: #e3f577;
 }
 
 div[data-baseweb="select"] > div,
