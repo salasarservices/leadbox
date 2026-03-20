@@ -80,10 +80,10 @@
 
 .stButton>button{
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 650;
-  background-color: #e3f577;
+  background-color: #afcf23;
 }
 
 div[data-baseweb="select"] > div,
