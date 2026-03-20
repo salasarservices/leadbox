@@ -144,7 +144,7 @@ footer { visibility: hidden; }
   margin-top: 10px;
   text-align:center;
   font-size: 0.82rem;
-  color: var(--muted);
+  color: var(--kpi-num);
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
