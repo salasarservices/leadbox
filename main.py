@@ -17,6 +17,7 @@ import string
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+import streamlit.components.v1 as st_components
 from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING, DESCENDING, UpdateOne
 from pymongo.errors import BulkWriteError, DuplicateKeyError
@@ -568,10 +569,18 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     </div>
   </div>
 </div>
+"""
+
+
+def kpi_counter_script(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
+    brok = format_inr_compact(total_brokerage)
+    conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
+    return f"""
 <script>
 (function() {{
   function animateCounters() {{
-    var els = document.querySelectorAll('.kpi-number[data-target]');
+    var root = window.parent.document;
+    var els = root.querySelectorAll('.kpi-number[data-target]');
     els.forEach(function(el) {{
       var type = el.getAttribute('data-type');
       var target = el.getAttribute('data-target');
@@ -603,11 +612,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
       requestAnimationFrame(step);
     }});
   }}
-  if (document.readyState === 'loading') {{
-    document.addEventListener('DOMContentLoaded', animateCounters);
-  }} else {{
-    setTimeout(animateCounters, 100);
-  }}
+  setTimeout(animateCounters, 300);
 }})();
 </script>
 """
@@ -1450,6 +1455,10 @@ if page == "Leads":
     st.markdown(
         kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
         unsafe_allow_html=True,
+    )
+    st_components.html(
+        kpi_counter_script(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
+        height=0,
     )
 
     table_title = "Filtered Leads" if is_filtered else "Leads"
