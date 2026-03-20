@@ -339,3 +339,149 @@ div[role="tooltip"] * {
   text-transform: uppercase;
   opacity: 0.85;
 }
+
+/* ─── RESPONSIVE / MOBILE ─────────────────────────────────────────────────── */
+
+/* Fluid container on all screen sizes */
+.block-container {
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+}
+
+/* Tablet — up to 1024px */
+@media (max-width: 1024px) {
+  .block-container {
+    max-width: 100% !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  /* KPI row wraps and each box grows to fill */
+  .kpi-wrap {
+    width: calc(33.33% - 10px) !important;
+    min-width: 100px;
+  }
+  .kpi {
+    width: 100% !important;
+    height: 88px !important;
+  }
+}
+
+/* Mobile — up to 768px */
+@media (max-width: 768px) {
+  .block-container {
+    max-width: 100% !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    padding-top: 0.5rem !important;
+  }
+
+  /* KPI: 3 per row on mobile */
+  .kpi-wrap {
+    width: calc(33.33% - 8px) !important;
+    min-width: 90px;
+  }
+  .kpi {
+    width: 100% !important;
+    height: 80px !important;
+  }
+  .kpi-number {
+    font-size: 1.4rem !important;
+  }
+  -sub {
+    font-size: 0.65rem !important;
+  }
+
+  /* Cards: full width, tighter padding */
+  .lb-card {
+    padding: 10px 10px 8px 10px !important;
+    margin-bottom: 8px !important;
+  }
+  .lb-title {
+    font-size: 0.88rem !important;
+  }
+  .lb-subtitle {
+    font-size: 0.78rem !important;
+  }
+
+  /* Buttons: full width touch targets */
+  .stButton > button {
+    width: 100% !important;
+    padding: 0.65rem 1rem !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* Inputs: full width */
+  .stTextInput input,
+  .stTextArea textarea,
+  .stNumberInput input,
+  div[data-baseweb="select"] > div {
+    font-size: 0.92rem !important;
+  }
+
+  /* Table: allow horizontal scroll */
+  .lb-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 8px !important;
+  }
+
+  div[data-testid="stDataFrame"] {
+    overflow-x: auto !important;
+  }
+
+  /* Comments */
+  .lb-comments-view {
+    padding: 8px 10px !important;
+  }
+  .lb-comment-text {
+    font-size: 0.85rem !important;
+  }
+
+  /* DB pill */
+  .db-pill {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Sidebar: full width overlay on mobile (Streamlit handles this natively,
+     but ensure content inside doesn't overflow) */
+  section[data-testid="stSidebar"] > div {
+    padding: 0.75rem !important;
+  }
+
+  /* Loader: center properly on small screens */
+  #lb-db-loader .loader {
+    margin-top: 20px;
+  }
+}
+
+/* Small mobile — up to 480px */
+@media (max-width: 480px) {
+  /* KPI: 2 per row on very small screens */
+  .kpi-wrap {
+    width: calc(50% - 6px) !important;
+    min-width: 0;
+  }
+  .kpi {
+    height: 75px !important;
+  }
+  .kpi-number {
+    font-size: 1.25rem !important;
+  }
+
+  .lb-title {
+    font-size: 0.82rem !important;
+    letter-spacing: 0.02em !important;
+  }
+
+  /* Stack Streamlit columns vertically */
+  div[data-testid="stHorizontalBlock"] {
+    flex-direction: column !important;
+  }
+  div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+    width: 100% !important;
+    min-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+}
