@@ -511,6 +511,7 @@ def allocation_chain_text(lead: dict) -> str:
 
 def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
+    conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
     return f"""
 <div class="kpi-row" style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
   <div class="kpi-wrap">
@@ -558,6 +559,16 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
       <div class="kpi-inner">
         <div class="kpi-number">{brok}</div>
         <div class="kpi-sub">Total Brokerage</div>
+      </div>
+    </div>
+    <div class="kpi-title-below"></div>
+  </div>
+
+  <div class="kpi-wrap">
+    <div class="kpi" style="background: #7C4DFF;">
+      <div class="kpi-inner">
+        <div class="kpi-number">{conversion}</div>
+        <div class="kpi-sub">Conversion Rate</div>
       </div>
     </div>
     <div class="kpi-title-below"></div>
