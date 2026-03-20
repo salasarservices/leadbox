@@ -65,9 +65,9 @@
   margin-top: -2px;
 }
 
-.lb-navy{ background: linear-gradient(180deg, var(--pastel-navy)); }
-.lb-lime{ background: linear-gradient(180deg, var(--pastel-lime)); }
-.lb-cyan{ background: linear-gradient(180deg, var(--pastel-cyan)); }
+.lb-navy{ background: var(--pastel-navy); }
+.lb-lime{ background: var(--pastel-lime); }
+.lb-cyan{ background: var(--pastel-cyan); }
 
 .stButton>button{
   border-radius: 10px;
