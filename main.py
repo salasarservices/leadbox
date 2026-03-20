@@ -1457,8 +1457,8 @@ with header_l:
     st.image(LOGO_URL, width=165)
 with header_r:
     st.markdown(
-        "<div style='font-size:1.35rem;font-weight:800;color:#2d448d;letter-spacing:-0.02em;'>LEADBOX DASHBOARD</div>"
-        "<div style='color:#64748b;margin-top:-4px;'>Leads • Notes • Month-wise filtering</div>",
+        "<div style='font-size:2rem;font-weight:800;color:#2d448d;letter-spacing:-0.02em;'>LEADBOX DASHBOARD</div>"
+        "<div style='color:#64748b;margin-top:-4px;'>Lead Management System</div>",
         unsafe_allow_html=True,
     )
 
