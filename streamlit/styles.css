@@ -263,6 +263,15 @@ div[role="tooltip"] * {
   color: #ffffff !important;
 }
 
+/* Field-level help tooltips (question mark icons on inputs) */
+div[data-testid="stTooltipIcon"] div[role="tooltip"],
+div[data-testid="stTooltipIcon"] div[role="tooltip"] * {
+  color: #138bd1 !important;
+  background: #ffffff !important;
+  border: 1px solid #138bd1 !important;
+  box-shadow: 0 4px 12px rgba(19, 139, 209, 0.15) !important;
+}
+
 /* DB loader overlay */
 .loader {
   width: 24px;
