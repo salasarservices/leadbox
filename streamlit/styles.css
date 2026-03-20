@@ -72,10 +72,11 @@
 .lb-brokerage{ background: #536DFE; }
 
 .stButton>button{
-  border-radius: 10px;
-  border: 1px solid var(--border);
+  border-radius: 2px;
+  border: 1px solid #C2DEFA;
   padding: 0.55rem 0.85rem;
   font-weight: 650;
+  background-color: #C2DEFA;
 }
 
 div[data-baseweb="select"] > div,
