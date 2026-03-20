@@ -11,7 +11,7 @@
 
   --pastel-navy:#448AFF;
   --pastel-lime:#11C15B;
-  --pastel-cyan:#00BFA5;
+  --pastel-cyan:#536DFE;
 
   --text:#0f172a;
   --title-text:#fff;
@@ -68,15 +68,12 @@
 .lb-navy{ background: var(--pastel-navy); }
 .lb-lime{ background: var(--pastel-lime); }
 .lb-cyan{ background: var(--pastel-cyan); }
-.lb-lost{ background: #FF5252; }
-.lb-brokerage{ background: #536DFE; }
 
 .stButton>button{
-  border-radius: 2px;
-  border: 1px solid #C2DEFA;
+  border-radius: 10px;
+  border: 1px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 650;
-  background-color: #C2DEFA;
 }
 
 div[data-baseweb="select"] > div,
@@ -99,14 +96,14 @@ footer { visibility: hidden; }
   align-items: flex-start;
 }
 .kpi-wrap{
-  width: 170px;
+  width: 145px;
   display:flex;
   flex-direction: column;
   align-items: center;
 }
 .kpi{
-  width: 170px;
-  height: 108px;
+  width: 145px;
+  height: 95px;
   border-radius: 1px;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -121,10 +118,10 @@ footer { visibility: hidden; }
 }
 .kpi-inner{
   text-align:center;
-  padding: 12px;
+  padding: 8px;
 }
 .kpi-number{
-  font-size: 2.2rem;
+  font-size: 1.9rem;
   font-weight: 900;
   line-height: 1.05;
   color: var(--kpi-num);
@@ -145,7 +142,7 @@ footer { visibility: hidden; }
   margin-top: 10px;
   text-align:center;
   font-size: 0.82rem;
-  color: var(--kpi-num);
+  color: var(--muted);
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
