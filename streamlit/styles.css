@@ -55,7 +55,7 @@
 .lb-title{
   font-weight: 800;
   color: var(--title-text);
-  font-size: 1.2rem;
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
