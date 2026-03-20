@@ -1310,7 +1310,7 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
         hide_index=True,
         height=390,
         column_config={
-            "Number": st.column_config.NumberColumn("Number", width="small"),
+            "Number": st.column_config.NumberColumn("NUMBER", width="small"),
             "Lead ID": st.column_config.TextColumn("Lead ID", width="small"),
             "Name": st.column_config.TextColumn("Name", width="medium"),
             "Company": st.column_config.TextColumn("Company", width="medium"),
