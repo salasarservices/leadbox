@@ -51,9 +51,7 @@
   gap:10px;
   margin-bottom: 10px;
 }
-.lb-dot{
-  width:10px;height:10px;border-radius:999px;flex:0 0 10px;
-}
+
 .lb-title{
   font-weight: 800;
   color: var(--title-text);
