@@ -54,14 +54,14 @@
   width:10px;height:10px;border-radius:999px;flex:0 0 10px;
 }
 .lb-title{
-  font-weight: 700;
-  color: var(--navy);
-  font-size: 0.98rem;
+  font-weight: 800;
+  color: var(--text);
+  font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .lb-subtitle{
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.88rem;
   margin-top: -2px;
 }
