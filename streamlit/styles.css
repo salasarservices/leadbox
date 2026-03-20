@@ -68,6 +68,8 @@
 .lb-navy{ background: var(--pastel-navy); }
 .lb-lime{ background: var(--pastel-lime); }
 .lb-cyan{ background: var(--pastel-cyan); }
+.lb-lost{ background: #FF5252; }
+.lb-brokerage{ background: #536DFE; }
 
 .stButton>button{
   border-radius: 10px;
@@ -251,4 +253,3 @@ div[role="tooltip"] {
 div[role="tooltip"] * {
   color: #ffffff !important;
 }
-
