@@ -513,7 +513,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     brok = format_inr_compact(total_brokerage)
     conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
     return f"""
-<div class="kpi-row" style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
+<div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
   <div class="kpi-wrap">
     <div class="kpi" style="background: var(--pastel-navy);">
       <div class="kpi-inner">
