@@ -44,7 +44,7 @@
 
 .lb-card{
   background: var(--card);
-  border: 0px solid var(--border);
+  border: 1px solid var(--border);
   box-shadow: var(--shadow);
   border-radius: 1px;
   padding: 14px 14px 10px 14px;
@@ -79,11 +79,12 @@
 .lb-conversion{ background: var(--kpi-conversion); }
 
 .stButton>button{
-  border-radius: 0px;
-  border: 0px solid var(--border);
+  border-radius: 10px;
+  border: 1px solid var(--border);
   padding: 0.55rem 0.85rem;
-  font-weight: 650;
-  background-color: #afcf23;
+  font-weight: 400;
+  background-color: #e3f577;
+  text-transform: uppercase;
 }
 
 div[data-baseweb="select"] > div,
