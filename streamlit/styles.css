@@ -44,7 +44,7 @@
 
 .lb-card{
   background: var(--card);
-  border: 1px solid var(--border);
+  border: 0px solid var(--border);
   box-shadow: var(--shadow);
   border-radius: 1px;
   padding: 14px 14px 10px 14px;
