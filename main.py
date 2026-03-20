@@ -517,7 +517,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:var(--pastel-navy);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number navy" style="font-size:1.9rem;font-weight:900;color:#fff;">{total}</div>
+        <div class="kpi-number navy" data-target="{total}" data-type="int" style="font-size:1.9rem;font-weight:900;color:#fff;">0</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Total Leads</div>
       </div>
     </div>
@@ -526,7 +526,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:var(--pastel-lime);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number lime" style="font-size:1.9rem;font-weight:900;color:#fff;">{interested}</div>
+        <div class="kpi-number lime" data-target="{interested}" data-type="int" style="font-size:1.9rem;font-weight:900;color:#fff;">0</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Interested</div>
       </div>
     </div>
@@ -535,7 +535,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:#FF5252;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{not_interested}</div>
+        <div class="kpi-number" data-target="{not_interested}" data-type="int" style="font-size:1.9rem;font-weight:900;color:#fff;">0</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Lost</div>
       </div>
     </div>
@@ -544,7 +544,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:var(--pastel-cyan);width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number cyan" style="font-size:1.9rem;font-weight:900;color:#fff;">{closed}</div>
+        <div class="kpi-number cyan" data-target="{closed}" data-type="int" style="font-size:1.9rem;font-weight:900;color:#fff;">0</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Closed</div>
       </div>
     </div>
@@ -553,7 +553,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:#536DFE;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{brok}</div>
+        <div class="kpi-number" data-target="{brok}" data-type="text" style="font-size:1.9rem;font-weight:900;color:#fff;">-</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Total Brokerage</div>
       </div>
     </div>
@@ -562,12 +562,54 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   <div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">
     <div class="kpi" style="background:#7C4DFF;width:100%;height:95px;border-radius:1px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">
       <div class="kpi-inner" style="text-align:center;padding:8px;">
-        <div class="kpi-number" style="font-size:1.9rem;font-weight:900;color:#fff;">{conversion}</div>
+        <div class="kpi-number" data-target="{conversion}" data-type="percent" style="font-size:1.9rem;font-weight:900;color:#fff;">0%</div>
         <div class="kpi-sub" style="margin-top:4px;font-size:0.78rem;color:#fff;text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">Conversion Rate</div>
       </div>
     </div>
   </div>
 </div>
+<script>
+(function() {{
+  function animateCounters() {{
+    var els = document.querySelectorAll('.kpi-number[data-target]');
+    els.forEach(function(el) {{
+      var type = el.getAttribute('data-type');
+      var target = el.getAttribute('data-target');
+      if (type === 'text') {{
+        setTimeout(function() {{
+          el.style.transition = 'opacity 0.6s ease';
+          el.style.opacity = '0';
+          setTimeout(function() {{
+            el.textContent = target;
+            el.style.opacity = '1';
+          }}, 300);
+        }}, 200);
+        return;
+      }}
+      var endVal = parseFloat(type === 'percent' ? target.replace('%','') : target);
+      var duration = 1200;
+      var startTime = null;
+      var suffix = type === 'percent' ? '%' : '';
+      var decimals = type === 'percent' ? 1 : 0;
+      function step(timestamp) {{
+        if (!startTime) startTime = timestamp;
+        var progress = Math.min((timestamp - startTime) / duration, 1);
+        var ease = 1 - Math.pow(1 - progress, 3);
+        var current = endVal * ease;
+        el.textContent = current.toFixed(decimals) + suffix;
+        if (progress < 1) requestAnimationFrame(step);
+        else el.textContent = target;
+      }}
+      requestAnimationFrame(step);
+    }});
+  }}
+  if (document.readyState === 'loading') {{
+    document.addEventListener('DOMContentLoaded', animateCounters);
+  }} else {{
+    setTimeout(animateCounters, 100);
+  }}
+}})();
+</script>
 """
 
 
