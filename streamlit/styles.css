@@ -79,7 +79,7 @@
 .lb-conversion{ background: var(--kpi-conversion); }
 
 .stButton>button{
-  border-radius: 10px;
+  border-radius: 0px;
   border: 0px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 650;
