@@ -514,7 +514,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
     return f"""
 <div class="kpi-row" style="display:flex;gap:18px;flex-wrap:wrap;padding:10px 2px 6px 2px;align-items:flex-start;">
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-navy), #fff);">
+    <div class="kpi" style="background: var(--pastel-navy);">
       <div class="kpi-inner">
         <div class="kpi-number navy">{total}</div>
         <div class="kpi-sub">Total Leads</div>
@@ -524,7 +524,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-lime), #fff);">
+    <div class="kpi" style="background: var(--pastel-lime);">
       <div class="kpi-inner">
         <div class="kpi-number lime">{interested}</div>
         <div class="kpi-sub">Interested</div>
@@ -544,7 +544,7 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
   </div>
 
   <div class="kpi-wrap">
-    <div class="kpi" style="background: linear-gradient(180deg, var(--pastel-cyan), #fff);">
+    <div class="kpi" style="background: var(--pastel-cyan);">
       <div class="kpi-inner">
         <div class="kpi-number cyan">{closed}</div>
         <div class="kpi-sub">Closed</div>
