@@ -14,6 +14,7 @@
   --pastel-cyan:#536DFE;
 
   --text:#0f172a;
+  --title-text:#fff;
   --muted:#64748b;
   --kpi-num:#fff;
   --border:#fff;
@@ -55,13 +56,13 @@
 }
 .lb-title{
   font-weight: 800;
-  color: var(--text);
+  color: var(--title-text);
   font-size: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 .lb-subtitle{
-  color: var(--text);
+  color: var(--title-text);
   font-size: 0.88rem;
   margin-top: -2px;
 }
