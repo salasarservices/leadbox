@@ -1621,11 +1621,77 @@ st.write("")
 # -----------------------
 # Sidebar
 # -----------------------
-with st.sidebar:
-    db_status_pill(db_ok, db_detail)
+def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float) -> str:
+    initials = "".join(p[0].upper() for p in username.replace(".", " ").replace("_", " ").split() if p)[:2] or "??"
+    elapsed_s = int(datetime.now(timezone.utc).timestamp() - login_ts)
+    if elapsed_s < 60:
+        session_label = f"Active · {elapsed_s}s"
+    elif elapsed_s < 3600:
+        session_label = f"Active · {elapsed_s // 60}m"
+    else:
+        session_label = f"Active · {elapsed_s // 3600}h {(elapsed_s % 3600) // 60}m"
 
+    role_styles = {
+        ROLE_ADMIN:   {"bar": "#11C15B", "pill_bg": "#EAF3DE", "pill_text": "#3B6D11", "avatar_bg": "#EAF3DE", "avatar_text": "#27500A"},
+        ROLE_MANAGER: {"bar": "#448AFF", "pill_bg": "#E6F1FB", "pill_text": "#185FA5", "avatar_bg": "#E6F1FB", "avatar_text": "#0C447C"},
+        ROLE_VIEWER:  {"bar": "#888780", "pill_bg": "#F1EFE8", "pill_text": "#5F5E5A", "avatar_bg": "#F1EFE8", "avatar_text": "#444441"},
+    }
+    s = role_styles.get(role, role_styles[ROLE_VIEWER])
+    db_dot   = "#1D9E75" if db_ok else "#E24B4A"
+    db_label = "Connected"  if db_ok else "Error"
+    db_color = "#0F6E56"    if db_ok else "#A32D2D"
+
+    env = str(st.secrets.get("app_env") or "PRODUCTION").upper()
+    env_bg   = "#EAF3DE" if env == "PRODUCTION" else "#FAEEDA"
+    env_text = "#3B6D11" if env == "PRODUCTION" else "#854F0B"
+
+    return f"""
+<div style="background:var(--color-background-primary,#fff);border:0.5px solid rgba(15,23,42,0.12);
+  border-radius:12px;overflow:hidden;margin-bottom:10px;">
+  <div style="height:3px;background:{s['bar']};"></div>
+  <div style="padding:12px 14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div style="width:36px;height:36px;border-radius:50%;background:{s['avatar_bg']};
+        display:flex;align-items:center;justify-content:center;
+        font-size:13px;font-weight:600;color:{s['avatar_text']};flex-shrink:0;">{initials}</div>
+      <div style="min-width:0;flex:1;">
+        <div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis;">{username}</div>
+        <div style="font-size:11px;color:#64748b;font-family:monospace;">@{username}</div>
+      </div>
+      <span style="background:{s['pill_bg']};color:{s['pill_text']};font-size:10px;
+        font-weight:600;padding:3px 8px;border-radius:999px;white-space:nowrap;
+        letter-spacing:0.04em;">{role.upper()}</span>
+    </div>
+    <div style="border-top:0.5px solid rgba(15,23,42,0.08);padding-top:10px;
+      display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#64748b;">Session</span>
+        <span style="font-size:11px;color:#0f172a;">{session_label}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#64748b;">DB</span>
+        <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:{db_color};">
+          <span style="width:6px;height:6px;border-radius:50%;background:{db_dot};display:inline-block;"></span>
+          {db_label}
+        </span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:11px;color:#64748b;">Env</span>
+        <span style="background:{env_bg};color:{env_text};font-size:10px;padding:2px 7px;
+          border-radius:999px;font-weight:600;">{env}</span>
+      </div>
+    </div>
+  </div>
+</div>
+"""
     logged_in_user = st.session_state.get("logged_in_user") or "unknown"
-    st.caption(f"Signed in as: `{logged_in_user}` · Role: `{current_role().upper()}`")
+    login_ts = float(st.session_state.get("last_activity_ts") or datetime.now(timezone.utc).timestamp())
+    st.markdown(
+        user_status_card_html(logged_in_user, current_role(), db_ok, login_ts),
+        unsafe_allow_html=True,
+    )
+
     if st.button("Logout", use_container_width=True):
         logout_user("You have been logged out.")
 
