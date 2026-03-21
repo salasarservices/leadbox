@@ -2026,14 +2026,17 @@ if page == "Leads":
             else:
                 st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
-            comment_edit = st.text_area(
-                "Comments (optional)",
-                value=existing_comment_default,
-                height=90,
-                placeholder="Update comment for this lead...",
-                help="Saving will add this as a new note entry (keeps history).",
-                key=f"edit_comment_{lead.get('leadId')}",
-            )
+            if can_edit_leads():
+                comment_edit = st.text_area(
+                    "Add new comment",
+                    value="",
+                    height=90,
+                    placeholder="Type a new comment to add...",
+                    help="Saves as a new note entry — previous comments are preserved.",
+                    key=f"edit_comment_{lead.get('leadId')}",
+                )
+            else:
+                comment_edit = ""
 
             st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
 
@@ -2112,7 +2115,7 @@ if page == "Leads":
                         st.error("Lead ID collision occurred. Try saving again.")
                         st.stop()
 
-                    if (comment_edit or "").strip() and (comment_edit or "").strip() != existing_comment_default.strip():
+                    if (comment_edit or "").strip():
                         add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                 st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
@@ -2154,7 +2157,9 @@ if page == "Leads":
                 ),
                 reverse=True,
             )
+
             if can_delete_comments() and notes_sorted:
+                # Admin: all comments with delete button
                 for idx, note in enumerate(notes_sorted):
                     meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
                     st.markdown(f"**{meta}**")
@@ -2166,8 +2171,52 @@ if page == "Leads":
                         st.rerun()
                     if idx < len(notes_sorted) - 1:
                         st.divider()
+
+            elif can_edit_leads() and notes_sorted:
+                # Manager: read-only for all except most recent which gets inline edit
+                for idx, note in enumerate(notes_sorted):
+                    meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
+                    st.markdown(f"**{meta}**")
+                    if idx == 0:
+                        # Most recent — editable inline
+                        edited_text = st.text_area(
+                            "Edit comment",
+                            value=str((note or {}).get("text") or "").strip(),
+                            height=100,
+                            key=f"inline_edit_comment_{selected_lead.get('leadId')}",
+                            label_visibility="collapsed",
+                        )
+                        if st.button("Save comment", key=f"save_inline_comment_{selected_lead.get('leadId')}", use_container_width=True):
+                            if edited_text.strip():
+                                with db_loader("Saving comment..."):
+                                    add_note(selected_lead["_id"], edited_text.strip(), created_by=current_username())
+                                st.success("Comment saved.")
+                                st.rerun()
+                    else:
+                        st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
+                    if idx < len(notes_sorted) - 1:
+                        st.divider()
+
+                # Also allow adding a brand new comment
+                st.divider()
+                new_comment = st.text_area(
+                    "Add new comment",
+                    value="",
+                    height=80,
+                    placeholder="Type a new comment...",
+                    key=f"new_comment_{selected_lead.get('leadId')}",
+                )
+                if st.button("Add comment", key=f"add_comment_{selected_lead.get('leadId')}", use_container_width=True):
+                    if new_comment.strip():
+                        with db_loader("Adding comment..."):
+                            add_note(selected_lead["_id"], new_comment.strip(), created_by=current_username())
+                        st.success("Comment added.")
+                        st.rerun()
+
             else:
+                # Viewer: fully read-only
                 st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
+
             card_close()
 
             card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
