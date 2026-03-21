@@ -1551,6 +1551,11 @@ def delete_note(_id: ObjectId, note: dict) -> None:
     col.update_one({"_id": _id}, {"$pull": {"notes": note}, "$set": {"updatedAt": now_utc()}})
 
 
+def delete_policy_copy(_id: ObjectId) -> None:
+    col = leads_col()
+    col.update_one({"_id": _id}, {"$unset": {"policyCopy": ""}, "$set": {"updatedAt": now_utc()}})
+
+
 def create_lead(payload: dict) -> ObjectId:
     col = leads_col()
 
@@ -2182,6 +2187,12 @@ if page == "Leads":
             if selected_status == "Closed" and policy_copy_present(selected_lead):
                 if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
                     show_policy_copy_dialog(selected_lead)
+                if is_admin():
+                    if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
+                        with db_loader("Deleting policy copy..."):
+                            delete_policy_copy(lead_oid)
+                        st.success("Policy copy deleted.")
+                        st.rerun()
 
             if can_manage_deletions():
                 st.markdown("---")
@@ -2217,16 +2228,60 @@ if page == "Leads":
             )
 
             if can_delete_comments() and notes_sorted:
-                # Admin: all comments with delete button
+                # Admin: all comments with edit + delete, styled background
                 for idx, note in enumerate(notes_sorted):
-                    meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
-                    st.markdown(f"**{meta}**")
-                    st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
-                    if st.button("Delete comment", key=f"del_note_{selected_lead.get('leadId')}_{idx}"):
-                        with db_loader("Deleting comment..."):
-                            delete_note(selected_lead["_id"], note)
-                        st.success("Comment deleted.")
-                        st.rerun()
+                    author = str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'
+                    ts     = format_note_datetime_ist((note or {}).get('createdAt'))
+                    text   = str((note or {}).get("text") or "").strip() or "(empty comment)"
+                    edit_key_a = f"admin_editing_{selected_lead.get('leadId')}_{idx}"
+                    is_editing_a = st.session_state.get(edit_key_a, False)
+
+                    st.markdown(
+                        f"""<div style="background:rgb(234,243,222);border-radius:6px;padding:10px 12px;margin-bottom:4px;">
+  <div style="color:rgb(59,109,17);font-size:0.80rem;font-weight:800;
+    text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">
+    {author} • {ts}
+  </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    if is_editing_a:
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        edited_a = st.text_area(
+                            "Edit",
+                            value=text,
+                            height=100,
+                            key=f"admin_edit_text_{selected_lead.get('leadId')}_{idx}",
+                            label_visibility="collapsed",
+                        )
+                        col_as, col_ac = st.columns(2)
+                        with col_as:
+                            if st.button("Save", key=f"admin_save_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
+                                if edited_a.strip():
+                                    with db_loader("Saving comment..."):
+                                        add_note(selected_lead["_id"], edited_a.strip(), created_by=current_username())
+                                    st.session_state[edit_key_a] = False
+                                    st.success("Comment saved.")
+                                    st.rerun()
+                        with col_ac:
+                            if st.button("Cancel", key=f"admin_cancel_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
+                                st.session_state[edit_key_a] = False
+                                st.rerun()
+                    else:
+                        st.markdown(
+                            f'<div style="color:#1f2937;font-size:0.92rem;white-space:pre-wrap;word-break:break-word;">{text}</div></div>',
+                            unsafe_allow_html=True,
+                        )
+                        col_ae, col_ad = st.columns(2)
+                        with col_ae:
+                            if st.button("Edit", key=f"admin_edit_btn_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
+                                st.session_state[edit_key_a] = True
+                                st.rerun()
+                        with col_ad:
+                            if st.button("Delete", key=f"del_note_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
+                                with db_loader("Deleting comment..."):
+                                    delete_note(selected_lead["_id"], note)
+                                st.success("Comment deleted.")
+                                st.rerun()
                     if idx < len(notes_sorted) - 1:
                         st.divider()
 
