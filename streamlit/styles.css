@@ -18,9 +18,6 @@
   --kpi-conversion:#7C4DFF;
   --kpi-allocated:#536DFE;
 
-  --comment-view-bg:#ecfbfa;
-  --comment-meta-text:#4d7c0f;
-
   --text:#0f172a;
   --title-text:#fff;
   --muted:#64748b;
@@ -82,8 +79,8 @@
 .lb-conversion{ background: var(--kpi-conversion); }
 
 .stButton>button{
-  border-radius: 0px;
-  border: 0px solid var(--border);
+  border-radius: 10px;
+  border: 1px solid var(--border);
   padding: 0.55rem 0.85rem;
   font-weight: 400;
   background-color: #e3f577;
@@ -180,7 +177,7 @@ footer { visibility: hidden; }
 }
 
 /* Scrollable dataframe container */
-.lb--wrap{
+.lb-table-wrap{
   border: 1px solid rgba(15,23,42,0.08);
   border-radius: 14px;
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
@@ -198,7 +195,7 @@ footer { visibility: hidden; }
 
 /* Read-only comments section */
 .lb-comments-view{
-  background: var(--comment-view-bg);
+  background: var(--pastel-lime);
   border: 1px solid rgba(90, 127, 17, 0.22);
   border-radius: 1px;
   padding: 10px 12px;
@@ -207,7 +204,7 @@ footer { visibility: hidden; }
   padding: 8px 0;
 }
 .lb-comment-meta{
-  color: var(--comment-meta-text);
+  color: #4d7c0f;
   font-size: 0.80rem;
   font-weight: 800;
   margin-bottom: 4px;
@@ -227,11 +224,12 @@ footer { visibility: hidden; }
 
 /* Filtered leads table header styling */
 div[data-testid="stDataFrame"] [role="columnheader"] {
-  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%) !important;
+  background: #42A6FF !important;
 }
 
 div[data-testid="stDataFrame"] [role="columnheader"] * {
   font-weight: 800 !important;
+  color: #ffffff !important;
   text-align: center !important;
   justify-content: center !important;
 }
@@ -277,57 +275,32 @@ div[data-testid="stTooltipIcon"] div[role="tooltip"] * {
 
 /* DB loader overlay */
 .loader {
-  width: 24px;
-  height: 80px;
-  display: block;
-  margin: 35px auto 0;
-  border: 1px solid #FFF;
-  border-radius: 0 0 50px 50px;
+  width: 48px;
+  height: 48px;
+  display: inline-block;
   position: relative;
-  box-shadow: 0px 0px #FF3D00 inset;
-  background-image: linear-gradient(#FF3D00 100px, transparent 0);
-  background-position: 0px 0px;
-  background-size: 22px 80px;
-  background-repeat: no-repeat;
+  border: 4px solid #FFF;
   box-sizing: border-box;
-  animation: animloader 6s linear infinite;
+  animation: fill 2s linear infinite alternate;
+  color: rgba(255, 61, 0, 0.9);
+  border-radius: 0 0 4px 4px;
 }
 .loader::after {
   content: '';
   box-sizing: border-box;
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%);
   position: absolute;
-  border: 1px solid #FFF;
-  border-radius: 50%;
-  width: 28px;
-  height: 6px;
-}
-.loader::before {
-  content: '';
-  box-sizing: border-box;
-  left: 0;
-  bottom: -4px;
-  border-radius: 50%;
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  animation: animloader1 6s linear infinite;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 4px solid #FFF;
+  width: 20px;
+  height: 25px;
+  border-radius: 0 4px 4px 0;
 }
 
-@keyframes animloader {
-  0%   { background-position: 0px 80px; }
-  100% { background-position: 0px 0px; }
-}
-
-@keyframes animloader1 {
-  0%   { box-shadow: 4px -10px rgba(255,255,255,0), 6px 0px rgba(255,255,255,0), 8px -15px rgba(255,255,255,0), 12px 0px rgba(255,255,255,0); }
-  20%  { box-shadow: 4px -20px rgba(255,255,255,0), 8px -10px rgba(255,255,255,0), 10px -30px rgba(255,255,255,0.5), 15px -5px rgba(255,255,255,0); }
-  40%  { box-shadow: 2px -40px rgba(255,255,255,0.5), 8px -30px rgba(255,255,255,0.4), 8px -60px rgba(255,255,255,0.5), 12px -15px rgba(255,255,255,0.5); }
-  60%  { box-shadow: 4px -60px rgba(255,255,255,0.5), 6px -50px rgba(255,255,255,0.4), 10px -90px rgba(255,255,255,0.5), 15px -25px rgba(255,255,255,0.5); }
-  80%  { box-shadow: 2px -80px rgba(255,255,255,0.5), 4px -70px rgba(255,255,255,0.4), 8px -120px rgba(255,255,255,0), 12px -35px rgba(255,255,255,0.5); }
-  100% { box-shadow: 4px -100px rgba(255,255,255,0), 8px -90px rgba(255,255,255,0), 10px -120px rgba(255,255,255,0), 15px -45px rgba(255,255,255,0); }
+@keyframes fill {
+  0%   { box-shadow: 0 0 inset; }
+  100% { box-shadow: 0 -48px inset; }
 }
 
 #lb-db-loader {
