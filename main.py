@@ -899,7 +899,7 @@ def can_manage_deletions() -> bool:
     return is_admin()
 
 def can_delete_comments() -> bool:
-    return is_manager_or_above()
+    return is_admin()
 
 def can_edit_leads() -> bool:
     return is_manager_or_above()
