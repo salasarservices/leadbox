@@ -195,7 +195,7 @@ footer { visibility: hidden; }
 
 /* Read-only comments section */
 .lb-comments-view{
-  background: var(--pastel-lime);
+  background: ##ecfbfa;
   border: 1px solid rgba(90, 127, 17, 0.22);
   border-radius: 1px;
   padding: 10px 12px;
