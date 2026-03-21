@@ -2026,17 +2026,7 @@ if page == "Leads":
             else:
                 st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
-            if can_edit_leads():
-                comment_edit = st.text_area(
-                    "Add new comment",
-                    value="",
-                    height=90,
-                    placeholder="Type a new comment to add...",
-                    help="Saves as a new note entry — previous comments are preserved.",
-                    key=f"edit_comment_{lead.get('leadId')}",
-                )
-            else:
-                comment_edit = ""
+            comment_edit = ""
 
             st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
 
