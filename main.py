@@ -1685,6 +1685,8 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
   </div>
 </div>
 """
+
+with st.sidebar:
     logged_in_user = st.session_state.get("logged_in_user") or "unknown"
     login_ts = float(st.session_state.get("last_activity_ts") or datetime.now(timezone.utc).timestamp())
     st.markdown(
