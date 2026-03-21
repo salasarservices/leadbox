@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import string
+import uuid
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -633,6 +634,19 @@ def format_note_datetime_ist(value: Any) -> str:
         dt_ist = dt.astimezone(IST)
         return dt_ist.strftime("%d %b %Y • %I:%M %p IST")
     return "Unknown timestamp"
+
+
+def format_edit_history(note: dict) -> str:
+    """Return a compact last-edited line if editHistory exists, else empty string."""
+    history = note.get("editHistory") or []
+    if not history:
+        return ""
+    last = history[-1]
+    by = str(last.get("editedBy") or "unknown").strip()
+    at = format_note_datetime_ist(last.get("editedAt"))
+    count = len(history)
+    suffix = f" ({count} edit{'s' if count > 1 else ''})" if count > 1 else ""
+    return f"Last edited by {by} • {at}{suffix}"
 
 
 def policy_copy_present(lead: dict) -> bool:
@@ -1504,8 +1518,60 @@ def update_lead(_id: ObjectId, updates: dict, push_ops: Optional[dict] = None):
 
 def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
     col = leads_col()
-    note = {"text": text.strip(), "createdAt": now_utc(), "createdBy": created_by}
+    note = {
+        "noteId": str(uuid.uuid4()),
+        "text": text.strip(),
+        "createdAt": now_utc(),
+        "createdBy": created_by,
+        "editHistory": [],
+    }
     col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+
+
+def edit_note(_id: ObjectId, note: dict, new_text: str) -> None:
+    """Edit an existing note in-place, preserving all original metadata.
+    Appends an editHistory entry with previousText, editedBy, editedAt.
+    If the note has no noteId (legacy), assigns one first.
+    """
+    col = leads_col()
+    note_id = note.get("noteId")
+    previous_text = str(note.get("text") or "").strip()
+    edit_entry = {
+        "previousText": previous_text,
+        "editedBy": current_username(),
+        "editedAt": now_utc(),
+    }
+
+    if note_id:
+        # Update by noteId using positional filtered operator
+        col.update_one(
+            {"_id": _id, "notes.noteId": note_id},
+            {
+                "$set": {
+                    "notes.$.text": new_text.strip(),
+                    "updatedAt": now_utc(),
+                },
+                "$push": {"notes.$.editHistory": edit_entry},
+            }
+        )
+    else:
+        # Legacy note — no noteId. Match by exact content and assign one.
+        new_note_id = str(uuid.uuid4())
+        col.update_one(
+            {
+                "_id": _id,
+                "notes.text": previous_text,
+                "notes.createdBy": note.get("createdBy"),
+            },
+            {
+                "$set": {
+                    "notes.$.noteId": new_note_id,
+                    "notes.$.text": new_text.strip(),
+                    "updatedAt": now_utc(),
+                },
+                "$push": {"notes.$.editHistory": edit_entry},
+            }
+        )
 
 
 def archive_lead(_id: ObjectId) -> None:
@@ -1578,7 +1644,7 @@ def create_lead(payload: dict) -> ObjectId:
         "brokerageReceived": payload.get("brokerageReceived", None),
         "netPremium": payload.get("netPremium", None),
         "policyCopy": payload.get("policyCopy") if normalize_lead_status(payload.get("leadStatus") or "Fresh") == "closed" else None,
-        "notes": ([{"text": initial_comment, "createdAt": now_utc(), "createdBy": created_by}] if initial_comment else []),
+        "notes": ([{"noteId": str(uuid.uuid4()), "text": initial_comment, "createdAt": now_utc(), "createdBy": created_by, "editHistory": []}] if initial_comment else []),
         "allocationHistory": ([{"from": allocation_name, "to": None, "editedAt": now_utc(), "editedBy": created_by}] if allocation_name else []),
         "emailRecipients": [],
         "messageText": None,
@@ -2230,13 +2296,16 @@ if page == "Leads":
             if can_delete_comments() and notes_sorted:
                 # Admin: all comments with edit + delete
                 for idx, note in enumerate(notes_sorted):
-                    author = str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'
-                    ts     = format_note_datetime_ist((note or {}).get('createdAt'))
-                    text   = str((note or {}).get("text") or "").strip() or "(empty comment)"
-                    edit_key_a = f"admin_editing_{selected_lead.get('leadId')}_{idx}"
+                    author   = str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'
+                    ts       = format_note_datetime_ist((note or {}).get('createdAt'))
+                    text     = str((note or {}).get("text") or "").strip() or "(empty comment)"
+                    edit_history_line = format_edit_history(note)
+                    edit_key_a   = f"admin_editing_{selected_lead.get('leadId')}_{idx}"
                     is_editing_a = st.session_state.get(edit_key_a, False)
 
                     st.markdown(f"**{author} • {ts}**")
+                    if edit_history_line:
+                        st.caption(edit_history_line)
 
                     if is_editing_a:
                         edited_a = st.text_area(
@@ -2249,11 +2318,14 @@ if page == "Leads":
                         col_as, col_ac = st.columns(2)
                         with col_as:
                             if st.button("Save", key=f"admin_save_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
-                                if edited_a.strip():
+                                if edited_a.strip() and edited_a.strip() != text:
                                     with db_loader("Saving comment..."):
-                                        add_note(selected_lead["_id"], edited_a.strip(), created_by=current_username())
+                                        edit_note(selected_lead["_id"], note, edited_a.strip())
                                     st.session_state[edit_key_a] = False
-                                    st.success("Comment saved.")
+                                    st.success("Comment updated.")
+                                    st.rerun()
+                                elif edited_a.strip() == text:
+                                    st.session_state[edit_key_a] = False
                                     st.rerun()
                         with col_ac:
                             if st.button("Cancel", key=f"admin_cancel_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
@@ -2282,7 +2354,10 @@ if page == "Leads":
                 else:
                     for idx, note in enumerate(notes_sorted):
                         meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
+                        edit_history_line = format_edit_history(note)
                         st.markdown(f"**{meta}**")
+                        if edit_history_line:
+                            st.caption(edit_history_line)
                         if idx == 0:
                             note_text = str((note or {}).get("text") or "").strip()
                             edit_key = f"editing_comment_{selected_lead.get('leadId')}"
@@ -2298,11 +2373,14 @@ if page == "Leads":
                                 col_save, col_cancel = st.columns(2)
                                 with col_save:
                                     if st.button("Save", key=f"save_inline_{selected_lead.get('leadId')}", use_container_width=True):
-                                        if edited_text.strip():
+                                        if edited_text.strip() and edited_text.strip() != note_text:
                                             with db_loader("Saving comment..."):
-                                                add_note(selected_lead["_id"], edited_text.strip(), created_by=current_username())
+                                                edit_note(selected_lead["_id"], note, edited_text.strip())
                                             st.session_state[edit_key] = False
-                                            st.success("Comment saved.")
+                                            st.success("Comment updated.")
+                                            st.rerun()
+                                        elif edited_text.strip() == note_text:
+                                            st.session_state[edit_key] = False
                                             st.rerun()
                                 with col_cancel:
                                     if st.button("Cancel", key=f"cancel_inline_{selected_lead.get('leadId')}", use_container_width=True):
