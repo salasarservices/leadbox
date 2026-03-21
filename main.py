@@ -2228,7 +2228,7 @@ if page == "Leads":
             )
 
             if can_delete_comments() and notes_sorted:
-                # Admin: all comments with edit + delete, styled background
+                # Admin: all comments with edit + delete
                 for idx, note in enumerate(notes_sorted):
                     author = str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'
                     ts     = format_note_datetime_ist((note or {}).get('createdAt'))
@@ -2236,16 +2236,9 @@ if page == "Leads":
                     edit_key_a = f"admin_editing_{selected_lead.get('leadId')}_{idx}"
                     is_editing_a = st.session_state.get(edit_key_a, False)
 
-                    st.markdown(
-                        f"""<div style="background:rgb(234,243,222);border-radius:6px;padding:10px 12px;margin-bottom:4px;">
-  <div style="color:rgb(59,109,17);font-size:0.80rem;font-weight:800;
-    text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">
-    {author} • {ts}
-  </div>""",
-                        unsafe_allow_html=True,
-                    )
+                    st.markdown(f"**{author} • {ts}**")
+
                     if is_editing_a:
-                        st.markdown("</div>", unsafe_allow_html=True)
                         edited_a = st.text_area(
                             "Edit",
                             value=text,
@@ -2267,10 +2260,7 @@ if page == "Leads":
                                 st.session_state[edit_key_a] = False
                                 st.rerun()
                     else:
-                        st.markdown(
-                            f'<div style="color:#1f2937;font-size:0.92rem;white-space:pre-wrap;word-break:break-word;">{text}</div></div>',
-                            unsafe_allow_html=True,
-                        )
+                        st.write(text)
                         col_ae, col_ad = st.columns(2)
                         with col_ae:
                             if st.button("Edit", key=f"admin_edit_btn_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
