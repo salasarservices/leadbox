@@ -18,6 +18,9 @@
   --kpi-conversion:#7C4DFF;
   --kpi-allocated:#536DFE;
 
+  --comment-meta-text:#ecfbfa;
+  --comment-meta-text:#4d7c0f;
+
   --text:#0f172a;
   --title-text:#fff;
   --muted:#64748b;
@@ -195,7 +198,7 @@ footer { visibility: hidden; }
 
 /* Read-only comments section */
 .lb-comments-view{
-  background: #ecfbfa;
+  background: var(--comment-meta-text);
   border: 1px solid rgba(90, 127, 17, 0.22);
   border-radius: 1px;
   padding: 10px 12px;
@@ -204,7 +207,7 @@ footer { visibility: hidden; }
   padding: 8px 0;
 }
 .lb-comment-meta{
-  color: #4d7c0f;
+  color: var(--comment-meta-text);
   font-size: 0.80rem;
   font-weight: 800;
   margin-bottom: 4px;
