@@ -18,7 +18,7 @@
   --kpi-conversion:#7C4DFF;
   --kpi-allocated:#536DFE;
 
-  --comment-meta-text:#ecfbfa;
+  --comment-view-bg:#ecfbfa;
   --comment-meta-text:#4d7c0f;
 
   --text:#0f172a;
@@ -198,7 +198,7 @@ footer { visibility: hidden; }
 
 /* Read-only comments section */
 .lb-comments-view{
-  background: var(--comment-meta-text);
+  background: var(--comment-view-bg);
   border: 1px solid rgba(90, 127, 17, 0.22);
   border-radius: 1px;
   padding: 10px 12px;
