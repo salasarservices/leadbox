@@ -1750,7 +1750,10 @@ with st.sidebar:
                     password=new_pwd,
                     updated_by=st.session_state.get("logged_in_user"),
                 )
-                st.success(msg_upd) if ok_upd else st.error(msg_upd)
+                if ok_upd:
+                    st.success(msg_upd)
+                else:
+                    st.error(msg_upd)
 
         st.divider()
 
@@ -1769,7 +1772,10 @@ with st.sidebar:
                     role=assign_role,
                     updated_by=st.session_state.get("logged_in_user"),
                 )
-                st.success(msg_r) if ok_r else st.error(msg_r)
+                if ok_r:
+                    st.success(msg_r)
+                else:
+                    st.error(msg_r)
 
         st.divider()
 
@@ -1786,7 +1792,10 @@ with st.sidebar:
                     username=selected_user_del,
                     updated_by=st.session_state.get("logged_in_user"),
                 )
-                st.success(msg_d) if ok_d else st.error(msg_d)
+                if ok_d:
+                    st.success(msg_d)
+                else:
+                    st.error(msg_d)
 
         st.divider()
 
