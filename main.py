@@ -38,6 +38,7 @@ MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", 
 DB_NAME = "sal-leads"
 COLL_LEADS = "leads"
 COLL_USERS = "leadbox-users"
+COLL_ARCHIVE = "lead-archive"
 SECRET_KEY_LEADS = "mongo_uri_leads"  # Streamlit secrets key
 LOGO_URL = "https://ik.imagekit.io/salasarservices/Salasar-Logo-new.png?updatedAt=1771587668127"
 
@@ -49,6 +50,37 @@ APP_DIR = Path(__file__).resolve().parent
 LEAD_ID_PREFIX = "SL"
 SUPER_ADMIN_USERNAME = "sallead"
 INACTIVITY_TIMEOUT_SECONDS = 30 * 60
+
+# -----------------------
+# RBAC
+# -----------------------
+ROLE_ADMIN   = "admin"
+ROLE_MANAGER = "manager"
+ROLE_VIEWER  = "viewer"
+
+VALID_ROLES = [ROLE_ADMIN, ROLE_MANAGER, ROLE_VIEWER]
+
+def current_role() -> str:
+    """Return the role of the currently logged-in user."""
+    if st.session_state.get("is_super_admin"):
+        return ROLE_ADMIN
+    return str(st.session_state.get("user_role") or ROLE_VIEWER).lower()
+
+def is_admin() -> bool:
+    return current_role() == ROLE_ADMIN
+
+def is_manager_or_above() -> bool:
+    return current_role() in {ROLE_ADMIN, ROLE_MANAGER}
+
+def is_viewer_only() -> bool:
+    return current_role() == ROLE_VIEWER
+
+def require_role(minimum_role: str) -> None:
+    """Stop execution if user doesn't meet the minimum role requirement."""
+    hierarchy = {ROLE_ADMIN: 3, ROLE_MANAGER: 2, ROLE_VIEWER: 1}
+    if hierarchy.get(current_role(), 0) < hierarchy.get(minimum_role, 99):
+        st.error("Access denied: insufficient permissions.")
+        st.stop()
 
 
 # -----------------------
@@ -101,25 +133,63 @@ def users_col_for_login() -> Optional[Any]:
 
 
 def hash_password(password: str) -> str:
+    """Legacy SHA-256 — only used for migrating old hashes."""
     return hashlib.sha256((password or "").encode("utf-8")).hexdigest()
 
 
-def check_db_user_login(username: str, password: str) -> bool:
+def hash_password_secure(password: str) -> str:
+    """Industry-standard: scrypt with a random 16-byte salt, stored as salt$hash (hex)."""
+    salt = secrets.token_hex(16)
+    dk = hashlib.scrypt((password or "").encode("utf-8"), salt=salt.encode(), n=16384, r=8, p=1)
+    return f"{salt}${dk.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """Verify against scrypt hash (salt$hash) or fall back to legacy SHA-256."""
+    if not stored:
+        return False
+    if "$" in stored:
+        try:
+            salt, dk_hex = stored.split("$", 1)
+            dk = hashlib.scrypt((password or "").encode("utf-8"), salt=salt.encode(), n=16384, r=8, p=1)
+            return hmac.compare_digest(dk.hex(), dk_hex)
+        except Exception:
+            return False
+    # Legacy SHA-256 fallback
+    return hmac.compare_digest(stored, hash_password(password))
+
+
+def check_db_user_login(username: str, password: str) -> Optional[str]:
+    """Returns the user's role string if login succeeds, else None."""
     uname = (username or "").strip().lower()
     pwd = password or ""
     if not uname or not pwd:
-        return False
+        return None
 
     col = users_col_for_login()
     if col is None:
-        return False
+        return None
 
-    doc = col.find_one({"username": uname, "isActive": {"$ne": False}}, {"passwordHash": 1})
+    doc = col.find_one(
+        {"username": uname, "isActive": {"$ne": False}},
+        {"passwordHash": 1, "role": 1}
+    )
     if not doc:
-        return False
+        return None
 
     stored = str(doc.get("passwordHash") or "")
-    return bool(stored) and hmac.compare_digest(stored, hash_password(pwd))
+    if not verify_password(pwd, stored):
+        return None
+
+    # Auto-migrate legacy SHA-256 hash to scrypt on successful login
+    if "$" not in stored:
+        col.update_one(
+            {"username": uname},
+            {"$set": {"passwordHash": hash_password_secure(pwd), "updatedAt": now_utc()}}
+        )
+
+    role = str(doc.get("role") or ROLE_MANAGER).lower()
+    return role if role in VALID_ROLES else ROLE_MANAGER
 
 
 def logout_user(reason: str = "You have been logged out.") -> None:
@@ -354,16 +424,20 @@ def login_gate() -> None:
             st.session_state["authenticated"] = True
             st.session_state["logged_in_user"] = username.lower()
             st.session_state["is_super_admin"] = username.lower() == SUPER_ADMIN_USERNAME
-            st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
-            st.rerun()
-        elif check_db_user_login(username, p):
-            st.session_state["authenticated"] = True
-            st.session_state["logged_in_user"] = username.lower()
-            st.session_state["is_super_admin"] = False
+            st.session_state["user_role"] = ROLE_ADMIN if username.lower() == SUPER_ADMIN_USERNAME else ROLE_MANAGER
             st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
             st.rerun()
         else:
-            st.error("Invalid username or password.")
+            role = check_db_user_login(username, p)
+            if role is not None:
+                st.session_state["authenticated"] = True
+                st.session_state["logged_in_user"] = username.lower()
+                st.session_state["is_super_admin"] = False
+                st.session_state["user_role"] = role
+                st.session_state["last_activity_ts"] = datetime.now(timezone.utc).timestamp()
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
 
     st.stop()
 
@@ -821,7 +895,17 @@ def current_username() -> str:
 
 
 def can_manage_deletions() -> bool:
-    return current_username() == SUPER_ADMIN_USERNAME
+    """Admins can archive/delete leads. Managers can delete comments."""
+    return is_admin()
+
+def can_delete_comments() -> bool:
+    return is_manager_or_above()
+
+def can_edit_leads() -> bool:
+    return is_manager_or_above()
+
+def can_create_leads() -> bool:
+    return is_manager_or_above()
 
 
 def generate_strong_password(length: int = 16) -> str:
@@ -837,7 +921,7 @@ def generate_strong_password(length: int = 16) -> str:
             return pwd
 
 
-def create_dashboard_user(username: str, password: str, created_by: str | None = None) -> tuple[bool, str]:
+def create_dashboard_user(username: str, password: str, role: str = ROLE_MANAGER, created_by: str | None = None) -> tuple[bool, str]:
     uname = (username or "").strip().lower()
     if not uname:
         return False, "Username is required."
@@ -845,23 +929,22 @@ def create_dashboard_user(username: str, password: str, created_by: str | None =
         return False, "Username must be 3-40 chars: lowercase letters, numbers, dot, underscore, hyphen."
     if not password:
         return False, "Password is required."
+    if role not in VALID_ROLES:
+        role = ROLE_MANAGER
 
     col = users_col()
-
     doc = {
         "username": uname,
-        "passwordHash": hash_password(password),
-        "passwordPlain": password,
+        "passwordHash": hash_password_secure(password),
         "createdAt": now_utc(),
         "updatedAt": now_utc(),
         "createdBy": (created_by or "").strip().lower() or None,
         "isActive": True,
-        "role": "user",
+        "role": role,
     }
-
     try:
         col.insert_one(doc)
-        return True, f"User '{uname}' created successfully."
+        return True, f"User '{uname}' created successfully with role '{role}'."
     except DuplicateKeyError:
         return False, f"User '{uname}' already exists."
 
@@ -873,13 +956,45 @@ def list_dashboard_users() -> List[dict]:
             {},
             {
                 "username": 1,
-                "passwordPlain": 1,
                 "isActive": 1,
+                "role": 1,
                 "createdAt": 1,
                 "updatedAt": 1,
             },
         ).sort([("username", ASCENDING)])
     )
+
+
+def set_user_role(username: str, role: str, updated_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Select a valid user."
+    if role not in VALID_ROLES:
+        return False, f"Invalid role. Must be one of: {', '.join(VALID_ROLES)}."
+    if uname == SUPER_ADMIN_USERNAME:
+        return False, "Cannot change role of super admin."
+    res = users_col().update_one(
+        {"username": uname},
+        {"$set": {"role": role, "updatedAt": now_utc(), "updatedBy": (updated_by or "").strip().lower() or None}},
+    )
+    if res.matched_count == 0:
+        return False, f"User '{uname}' not found."
+    return True, f"Role updated to '{role}' for '{uname}'."
+
+
+def deactivate_user(username: str, updated_by: str | None = None) -> tuple[bool, str]:
+    uname = (username or "").strip().lower()
+    if not uname:
+        return False, "Select a valid user."
+    if uname == SUPER_ADMIN_USERNAME:
+        return False, "Cannot deactivate the super admin."
+    res = users_col().update_one(
+        {"username": uname},
+        {"$set": {"isActive": False, "updatedAt": now_utc(), "deactivatedBy": (updated_by or "").strip().lower() or None}},
+    )
+    if res.matched_count == 0:
+        return False, f"User '{uname}' not found."
+    return True, f"User '{uname}' deactivated."
 
 
 def set_dashboard_user_password(username: str, password: str, updated_by: str | None = None) -> tuple[bool, str]:
@@ -888,16 +1003,15 @@ def set_dashboard_user_password(username: str, password: str, updated_by: str | 
         return False, "Select a valid user."
     if not password:
         return False, "Password is required."
-
     res = users_col().update_one(
         {"username": uname},
         {
             "$set": {
-                "passwordHash": hash_password(password),
-                "passwordPlain": password,
+                "passwordHash": hash_password_secure(password),
                 "updatedAt": now_utc(),
                 "updatedBy": (updated_by or "").strip().lower() or None,
-            }
+            },
+            "$unset": {"passwordPlain": ""},
         },
     )
     if res.matched_count == 0:
@@ -1000,6 +1114,13 @@ def ensure_indexes():
     users_existing = ucol.index_information()
     if "uniq_username" not in users_existing:
         ucol.create_index([("username", ASCENDING)], unique=True, name="uniq_username")
+
+    acol = mongo_client()[DB_NAME][COLL_ARCHIVE]
+    archive_existing = acol.index_information()
+    if "idx_archive_leadId" not in archive_existing:
+        acol.create_index([("leadId", ASCENDING)], name="idx_archive_leadId")
+    if "idx_archive_archivedAt" not in archive_existing:
+        acol.create_index([("archivedAt", DESCENDING)], name="idx_archive_archivedAt")
 
 
 def migrate_status_terms() -> None:
@@ -1387,9 +1508,42 @@ def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
     col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
 
 
-def delete_lead(_id: ObjectId) -> None:
+def archive_lead(_id: ObjectId) -> None:
+    """Soft delete: copy lead to lead-archive collection, mark as archived in leads."""
     col = leads_col()
-    col.delete_one({"_id": _id})
+    archive_col = mongo_client()[DB_NAME][COLL_ARCHIVE]
+    doc = col.find_one({"_id": _id})
+    if doc:
+        archived_doc = {
+            **doc,
+            "archivedAt": now_utc(),
+            "archivedBy": current_username(),
+            "originalId": doc["_id"],
+        }
+        archived_doc.pop("_id", None)
+        archive_col.insert_one(archived_doc)
+    col.update_one({"_id": _id}, {"$set": {"isArchived": True, "archivedAt": now_utc(), "archivedBy": current_username()}})
+
+
+def restore_lead(archive_id: ObjectId) -> None:
+    """Restore a lead from the archive back to active leads."""
+    archive_col = mongo_client()[DB_NAME][COLL_ARCHIVE]
+    doc = archive_col.find_one({"_id": archive_id})
+    if not doc:
+        return
+    col = leads_col()
+    original_id = doc.get("originalId")
+    if original_id:
+        col.update_one(
+            {"_id": original_id},
+            {"$unset": {"isArchived": "", "archivedAt": "", "archivedBy": ""}, "$set": {"updatedAt": now_utc()}}
+        )
+    archive_col.delete_one({"_id": archive_id})
+
+
+def fetch_archived_leads() -> list[dict]:
+    archive_col = mongo_client()[DB_NAME][COLL_ARCHIVE]
+    return list(archive_col.find({}).sort([("archivedAt", DESCENDING)]))
 
 
 def delete_note(_id: ObjectId, note: dict) -> None:
@@ -1471,7 +1625,7 @@ with st.sidebar:
     db_status_pill(db_ok, db_detail)
 
     logged_in_user = st.session_state.get("logged_in_user") or "unknown"
-    st.caption(f"Signed in as: `{logged_in_user}`")
+    st.caption(f"Signed in as: `{logged_in_user}` · Role: `{current_role().upper()}`")
     if st.button("Logout", use_container_width=True):
         logout_user("You have been logged out.")
 
@@ -1482,7 +1636,12 @@ with st.sidebar:
     # ❌ Removed: Admin: Lead ID migration (no longer shown in sidebar)
 
     card_open("Navigation", "lb-navy", "#2d448d", subtitle="Switch between modules")
-    page = st.radio("Go to", ["Leads", "Create Lead"], index=0, label_visibility="collapsed")
+    _nav_pages = ["Leads"]
+    if can_create_leads():
+        _nav_pages.append("Create Lead")
+    if is_admin():
+        _nav_pages.append("Archived Leads")
+    page = st.radio("Go to", _nav_pages, index=0, label_visibility="collapsed")
     card_close()
 
     allocs = allocated_to_suggestions()
@@ -1526,23 +1685,26 @@ with st.sidebar:
         if range_start > range_end:
             range_start, range_end = range_end, range_start
     card_close()
-    if st.session_state.get("is_super_admin") is True:
-        card_open("User Management", "lb-navy", "#2d448d", subtitle="Add users, manage passwords, and reveal current user credentials")
+    if is_admin():
+        card_open("User Management", "lb-navy", "#2d448d", subtitle="Manage users, roles and passwords")
 
+        # --- Create New User ---
+        st.markdown("**Create New User**")
         if "generated_password_create" not in st.session_state:
             st.session_state["generated_password_create"] = generate_strong_password(16)
 
         with st.form("create_user_form"):
             new_username = st.text_input("New Username", placeholder="e.g. team.member")
+            new_role = st.selectbox("Role", [ROLE_MANAGER, ROLE_VIEWER], index=0)
             generated_password = st.session_state.get("generated_password_create") or generate_strong_password(16)
             selected_password = st.text_input(
                 "Generated Strong Password",
                 value=generated_password,
-                help="Editable for super-admin: keep generated value or enter your own password.",
+                help="Keep generated value or enter your own strong password.",
             )
             create_cols = st.columns(2)
             with create_cols[0]:
-                refresh_generated = st.form_submit_button("Regenerate Password")
+                refresh_generated = st.form_submit_button("Regenerate")
             with create_cols[1]:
                 create_user_btn = st.form_submit_button("Add User")
 
@@ -1554,56 +1716,97 @@ with st.sidebar:
             ok_user, msg_user = create_dashboard_user(
                 username=new_username,
                 password=selected_password,
+                role=new_role,
                 created_by=st.session_state.get("logged_in_user"),
             )
             if ok_user:
-                st.success(f"{msg_user} Current password: {selected_password}")
+                st.success(f"{msg_user}\n\nShare this password securely: `{selected_password}`")
                 st.session_state["generated_password_create"] = generate_strong_password(16)
             else:
                 st.error(msg_user)
 
+        st.divider()
+
+        # --- Manage Existing Users ---
         users = list_dashboard_users()
-        usernames = [u.get("username") for u in users if u.get("username")]
+        usernames = [u.get("username") for u in users if u.get("username") and u.get("username") != SUPER_ADMIN_USERNAME]
+
+        st.markdown("**Update Password**")
         with st.form("change_user_password_form"):
-            st.markdown("**Change Existing User Password**")
-            selected_user = st.selectbox("Select User", options=usernames) if usernames else None
-            generated_update_password = generate_strong_password(16)
-            updated_password = st.text_input(
-                "New Password (Editable Generated Password)",
-                value=generated_update_password,
-                help="Use generated password or enter your preferred password.",
+            selected_user_pwd = st.selectbox("Select User", options=usernames, key="pwd_user_select") if usernames else None
+            new_pwd = st.text_input(
+                "New Password",
+                value=generate_strong_password(16),
+                help="Use generated password or enter a custom strong password.",
             )
             update_password_btn = st.form_submit_button("Update Password")
 
         if update_password_btn:
-            if not selected_user:
-                st.error("No users available to update.")
+            if not selected_user_pwd:
+                st.error("No users available.")
             else:
                 ok_upd, msg_upd = set_dashboard_user_password(
-                    username=selected_user,
-                    password=updated_password,
+                    username=selected_user_pwd,
+                    password=new_pwd,
                     updated_by=st.session_state.get("logged_in_user"),
                 )
-                if ok_upd:
-                    st.success(msg_upd)
-                else:
-                    st.error(msg_upd)
+                st.success(msg_upd) if ok_upd else st.error(msg_upd)
 
-        with st.expander("Click to reveal current users and passwords"):
-            users = list_dashboard_users()
-            if not users:
-                st.info("No users found.")
+        st.divider()
+
+        st.markdown("**Assign Role**")
+        with st.form("assign_role_form"):
+            selected_user_role = st.selectbox("Select User", options=usernames, key="role_user_select") if usernames else None
+            assign_role = st.selectbox("New Role", [ROLE_MANAGER, ROLE_VIEWER], key="assign_role_select")
+            assign_role_btn = st.form_submit_button("Update Role")
+
+        if assign_role_btn:
+            if not selected_user_role:
+                st.error("No users available.")
             else:
-                reveal_rows = []
-                for user_doc in users:
-                    reveal_rows.append(
-                        {
-                            "Username": user_doc.get("username") or "—",
-                            "Current Password": user_doc.get("passwordPlain") or "(legacy/unknown)",
-                            "Active": "Yes" if user_doc.get("isActive", True) else "No",
-                        }
-                    )
-                st.dataframe(pd.DataFrame(reveal_rows), use_container_width=True, hide_index=True)
+                ok_r, msg_r = set_user_role(
+                    username=selected_user_role,
+                    role=assign_role,
+                    updated_by=st.session_state.get("logged_in_user"),
+                )
+                st.success(msg_r) if ok_r else st.error(msg_r)
+
+        st.divider()
+
+        st.markdown("**Deactivate User**")
+        with st.form("deactivate_user_form"):
+            selected_user_del = st.selectbox("Select User", options=usernames, key="del_user_select") if usernames else None
+            deactivate_btn = st.form_submit_button("Deactivate User")
+
+        if deactivate_btn:
+            if not selected_user_del:
+                st.error("No users available.")
+            else:
+                ok_d, msg_d = deactivate_user(
+                    username=selected_user_del,
+                    updated_by=st.session_state.get("logged_in_user"),
+                )
+                st.success(msg_d) if ok_d else st.error(msg_d)
+
+        st.divider()
+
+        # --- User List (no passwords) ---
+        st.markdown("**Active Users**")
+        if users:
+            st.dataframe(
+                pd.DataFrame([
+                    {
+                        "Username": u.get("username") or "—",
+                        "Role": str(u.get("role") or ROLE_MANAGER).upper(),
+                        "Active": "Yes" if u.get("isActive", True) else "No",
+                    }
+                    for u in users
+                ]),
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No users found.")
 
         card_close()
 
@@ -1812,7 +2015,12 @@ if page == "Leads":
             )
 
             st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
-            save = st.button("Save changes", key=f"save_lead_{lead.get('leadId')}", use_container_width=True)
+
+            if can_edit_leads():
+                save = st.button("Save changes", key=f"save_lead_{lead.get('leadId')}", use_container_width=True)
+            else:
+                st.info("You have view-only access. Contact an admin to make changes.")
+                save = False
 
             if save:
                 # ---- Money parsing ----
@@ -1895,12 +2103,12 @@ if page == "Leads":
 
             if can_manage_deletions():
                 st.markdown("---")
-                st.caption("Super admin only")
-                if st.button("Delete this lead", key=f"delete_lead_{lead.get('leadId')}"):
-                    with db_loader("Deleting lead..."):
-                        delete_lead(lead_oid)
+                st.caption("Admin only")
+                if st.button("Archive this lead", key=f"archive_lead_{lead.get('leadId')}"):
+                    with db_loader("Archiving lead..."):
+                        archive_lead(lead_oid)
                     st.session_state.pop("selected_lead_id", None)
-                    st.success("Lead deleted.")
+                    st.success("Lead archived. View it under 'Archived Leads'.")
                     st.rerun()
 
         card_close()
@@ -1925,7 +2133,7 @@ if page == "Leads":
                 ),
                 reverse=True,
             )
-            if can_manage_deletions() and notes_sorted:
+            if can_delete_comments() and notes_sorted:
                 for idx, note in enumerate(notes_sorted):
                     meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
                     st.markdown(f"**{meta}**")
@@ -1964,6 +2172,7 @@ if page == "Leads":
             card_close()
 
 elif page == "Create Lead":
+    require_role(ROLE_MANAGER)
     card_open("Create Lead", "lb-navy", "#a6ce39", subtitle="Add a new lead (Lead ID generated from selected Lead Date)")
     product_opts = product_suggestions()
     alloc_opts = allocated_to_suggestions()
@@ -2050,5 +2259,52 @@ elif page == "Create Lead":
             new_id = create_lead(create_payload)
             created_doc = leads_col().find_one({"_id": new_id}, {"leadId": 1}) or {}
         st.success(f"Lead created: {created_doc.get('leadId') or 'Unknown'}")
+
+    card_close()
+
+elif page == "Archived Leads":
+    require_role(ROLE_ADMIN)
+    card_open("Archived Leads", "lb-lost", "#FF5252", subtitle="Soft-deleted leads — restore or permanently delete")
+
+    with db_loader("Fetching archived leads..."):
+        archived = fetch_archived_leads()
+
+    if not archived:
+        st.info("No archived leads found.")
+    else:
+        archive_rows = []
+        for doc in archived:
+            archive_rows.append({
+                "Lead ID":      doc.get("leadId") or "—",
+                "Name":         doc.get("contactName") or "—",
+                "Company":      doc.get("companyName") or "—",
+                "Status":       denormalize_lead_status(doc.get("leadStatus")) or "—",
+                "Archived By":  doc.get("archivedBy") or "—",
+                "Archived At":  format_note_datetime_ist(doc.get("archivedAt")),
+            })
+
+        st.dataframe(
+            pd.DataFrame(archive_rows),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("**Restore a Lead**")
+        archive_id_map = {
+            f"{doc.get('leadId') or '?'} — {doc.get('contactName') or '—'} (archived {format_note_datetime_ist(doc.get('archivedAt'))})": doc["_id"]
+            for doc in archived
+        }
+        selected_archive_label = st.selectbox(
+            "Select archived lead",
+            options=list(archive_id_map.keys()),
+            key="restore_lead_select",
+        )
+        if st.button("Restore Selected Lead", use_container_width=True):
+            selected_archive_id = archive_id_map.get(selected_archive_label)
+            if selected_archive_id:
+                with db_loader("Restoring lead..."):
+                    restore_lead(selected_archive_id)
+                st.success("Lead restored to active leads.")
+                st.rerun()
 
     card_close()
