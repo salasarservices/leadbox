@@ -2162,48 +2162,50 @@ if page == "Leads":
                     if idx < len(notes_sorted) - 1:
                         st.divider()
 
-            elif can_edit_leads() and notes_sorted:
+            elif can_edit_leads():
                 # Manager: read-only for all except most recent which gets click-to-edit
-                for idx, note in enumerate(notes_sorted):
-                    meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
-                    st.markdown(f"**{meta}**")
-                    if idx == 0:
-                        note_text = str((note or {}).get("text") or "").strip()
-                        edit_key = f"editing_comment_{selected_lead.get('leadId')}"
-                        is_editing = st.session_state.get(edit_key, False)
-
-                        if is_editing:
-                            edited_text = st.text_area(
-                                "Edit comment",
-                                value=note_text,
-                                height=100,
-                                key=f"inline_edit_text_{selected_lead.get('leadId')}",
-                                label_visibility="collapsed",
-                            )
-                            col_save, col_cancel = st.columns(2)
-                            with col_save:
-                                if st.button("Save", key=f"save_inline_{selected_lead.get('leadId')}", use_container_width=True):
-                                    if edited_text.strip():
-                                        with db_loader("Saving comment..."):
-                                            add_note(selected_lead["_id"], edited_text.strip(), created_by=current_username())
+                if not notes_sorted:
+                    st.info("No comments available for this lead.")
+                else:
+                    for idx, note in enumerate(notes_sorted):
+                        meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
+                        st.markdown(f"**{meta}**")
+                        if idx == 0:
+                            note_text = str((note or {}).get("text") or "").strip()
+                            edit_key = f"editing_comment_{selected_lead.get('leadId')}"
+                            is_editing = st.session_state.get(edit_key, False)
+                            if is_editing:
+                                edited_text = st.text_area(
+                                    "Edit comment",
+                                    value=note_text,
+                                    height=100,
+                                    key=f"inline_edit_text_{selected_lead.get('leadId')}",
+                                    label_visibility="collapsed",
+                                )
+                                col_save, col_cancel = st.columns(2)
+                                with col_save:
+                                    if st.button("Save", key=f"save_inline_{selected_lead.get('leadId')}", use_container_width=True):
+                                        if edited_text.strip():
+                                            with db_loader("Saving comment..."):
+                                                add_note(selected_lead["_id"], edited_text.strip(), created_by=current_username())
+                                            st.session_state[edit_key] = False
+                                            st.success("Comment saved.")
+                                            st.rerun()
+                                with col_cancel:
+                                    if st.button("Cancel", key=f"cancel_inline_{selected_lead.get('leadId')}", use_container_width=True):
                                         st.session_state[edit_key] = False
-                                        st.success("Comment saved.")
                                         st.rerun()
-                            with col_cancel:
-                                if st.button("Cancel", key=f"cancel_inline_{selected_lead.get('leadId')}", use_container_width=True):
-                                    st.session_state[edit_key] = False
+                            else:
+                                st.write(note_text or "(empty comment)")
+                                if st.button("Edit comment", key=f"edit_btn_{selected_lead.get('leadId')}", use_container_width=True):
+                                    st.session_state[edit_key] = True
                                     st.rerun()
                         else:
-                            st.write(note_text or "(empty comment)")
-                            if st.button("Edit comment", key=f"edit_btn_{selected_lead.get('leadId')}", use_container_width=True):
-                                st.session_state[edit_key] = True
-                                st.rerun()
-                    else:
-                        st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
-                    if idx < len(notes_sorted) - 1:
-                        st.divider()
+                            st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
+                        if idx < len(notes_sorted) - 1:
+                            st.divider()
 
-                # Add new comment
+                # Add new comment — always shown for managers
                 st.divider()
                 new_comment = st.text_area(
                     "Add new comment",
