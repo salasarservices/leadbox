@@ -1732,14 +1732,25 @@ with st.sidebar:
         usernames = [u.get("username") for u in users if u.get("username") and u.get("username") != SUPER_ADMIN_USERNAME]
 
         st.markdown("**Update Password**")
+        if "generated_password_update" not in st.session_state:
+            st.session_state["generated_password_update"] = generate_strong_password(16)
+
         with st.form("change_user_password_form"):
             selected_user_pwd = st.selectbox("Select User", options=usernames, key="pwd_user_select") if usernames else None
             new_pwd = st.text_input(
                 "New Password",
-                value=generate_strong_password(16),
+                value=st.session_state["generated_password_update"],
                 help="Use generated password or enter a custom strong password.",
             )
-            update_password_btn = st.form_submit_button("Update Password")
+            pwd_cols = st.columns(2)
+            with pwd_cols[0]:
+                regen_pwd_btn = st.form_submit_button("Regenerate")
+            with pwd_cols[1]:
+                update_password_btn = st.form_submit_button("Update Password")
+
+        if regen_pwd_btn:
+            st.session_state["generated_password_update"] = generate_strong_password(16)
+            st.rerun()
 
         if update_password_btn:
             if not selected_user_pwd:
@@ -1752,6 +1763,7 @@ with st.sidebar:
                 )
                 if ok_upd:
                     st.success(msg_upd)
+                    st.session_state["generated_password_update"] = generate_strong_password(16)
                 else:
                     st.error(msg_upd)
 
