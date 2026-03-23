@@ -613,16 +613,20 @@ def format_note_datetime_ist(value: Any) -> str:
 
 
 def format_edit_history(note: dict) -> str:
-    """Return a compact last-edited line if editHistory exists, else empty string."""
+    """Return edit metadata line based on whether editor differs from original author."""
     history = note.get("editHistory") or []
     if not history:
         return ""
     last = history[-1]
-    by = str(last.get("editedBy") or "unknown").strip()
+    editor = str(last.get("editedBy") or "unknown").strip().lower()
+    author = str(note.get("createdBy") or "unknown").strip().lower()
     at = format_note_datetime_ist(last.get("editedAt"))
     count = len(history)
     suffix = f" ({count} edit{'s' if count > 1 else ''})" if count > 1 else ""
-    return f"Last edited by {by} • {at}{suffix}"
+    if editor != author:
+        return f"Last edited by {last.get('editedBy') or 'unknown'} • {at}{suffix}"
+    else:
+        return f"Last edited • {at}{suffix}"
 
 
 def policy_copy_present(lead: dict) -> bool:
