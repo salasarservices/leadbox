@@ -2081,15 +2081,18 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
 
 <script>
 (function () {{
-  var START_TS = {login_ts};   // Unix epoch seconds, set server-side at login
+  // Floor the server timestamp to avoid float subtraction giving decimal seconds
+  var START_TS = Math.floor({login_ts});
   var el = document.getElementById('session-timer');
 
+  function pad(n) {{ return n < 10 ? '0' + n : '' + n; }}
+
   function fmt(s) {{
-    if (s < 60)   return 'Active \u00b7 ' + s + 's';
-    if (s < 3600) return 'Active \u00b7 ' + Math.floor(s / 60) + 'm ' + (s % 60) + 's';
     var h = Math.floor(s / 3600);
     var m = Math.floor((s % 3600) / 60);
-    return 'Active \u00b7 ' + h + 'h ' + m + 'm';
+    var sec = s % 60;
+    if (h > 0) return 'Active \u00b7 ' + h + ':' + pad(m) + ':' + pad(sec);
+    return 'Active \u00b7 ' + m + ':' + pad(sec);
   }}
 
   function tick() {{
@@ -2097,8 +2100,8 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
     if (el) el.textContent = fmt(elapsed);
   }}
 
-  tick();                        // run immediately so there's no blank flash
-  setInterval(tick, 1000);       // then update every second
+  tick();
+  setInterval(tick, 1000);
 }})();
 </script>
 </body>
