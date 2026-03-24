@@ -2006,13 +2006,6 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
     # If no dot, use the username itself (e.g. sallead → Sal)
     _name_part = username.split(".", 1)[1] if "." in username else username
     initials = (_name_part[:3].title() if _name_part else "??")
-    elapsed_s = int(datetime.now(timezone.utc).timestamp() - login_ts)
-    if elapsed_s < 60:
-        session_label = f"Active · {elapsed_s}s"
-    elif elapsed_s < 3600:
-        session_label = f"Active · {elapsed_s // 60}m"
-    else:
-        session_label = f"Active · {elapsed_s // 3600}h {(elapsed_s % 3600) // 60}m"
 
     role_styles = {
         ROLE_ADMIN:   {"bar": "#11C15B", "pill_bg": "#EAF3DE", "pill_text": "#3B6D11", "avatar_bg": "#EAF3DE", "avatar_text": "#27500A"},
@@ -2028,15 +2021,30 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
     env_bg   = "#EAF3DE" if env == "PRODUCTION" else "#FAEEDA"
     env_text = "#3B6D11" if env == "PRODUCTION" else "#854F0B"
 
-    return f"""
-<div style="background:var(--color-background-primary,#fff);border:0.5px solid rgba(15,23,42,0.12);
-  border-radius:12px;overflow:hidden;margin-bottom:10px;">
+    # login_ts is a Unix epoch (seconds). JS will compute elapsed time client-side
+    # and tick every second via setInterval — so no Streamlit rerun is needed.
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * {{ margin:0; padding:0; box-sizing:border-box; }}
+  body {{
+    background:transparent;
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    overflow:hidden;
+  }}
+</style>
+</head>
+<body>
+<div style="background:#fff;border:0.5px solid rgba(15,23,42,0.12);
+  border-radius:12px;overflow:hidden;">
   <div style="height:3px;background:{s['bar']};"></div>
   <div style="padding:12px 14px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <div style="width:36px;height:36px;border-radius:50%;background:{s['avatar_bg']};
         display:flex;align-items:center;justify-content:center;
-        font-size:11px;font-weight:700;color:{s['avatar_text']};flex-shrink:0;letter-spacing:0.02em;">{initials}</div>
+        font-size:11px;font-weight:700;color:{s['avatar_text']};flex-shrink:0;
+        letter-spacing:0.02em;">{initials}</div>
       <div style="min-width:0;flex:1;">
         <div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;
           overflow:hidden;text-overflow:ellipsis;">{username}</div>
@@ -2050,12 +2058,15 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
       display:flex;flex-direction:column;gap:6px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;color:#64748b;">Session</span>
-        <span style="font-size:11px;color:#0f172a;">{session_label}</span>
+        <span id="session-timer" style="font-size:11px;color:#0f172a;font-variant-numeric:tabular-nums;">
+          Active · 0s
+        </span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:11px;color:#64748b;">DB</span>
         <span style="display:flex;align-items:center;gap:5px;font-size:11px;color:{db_color};">
-          <span style="width:6px;height:6px;border-radius:50%;background:{db_dot};display:inline-block;"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:{db_dot};
+            display:inline-block;"></span>
           {db_label}
         </span>
       </div>
@@ -2067,14 +2078,41 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
     </div>
   </div>
 </div>
-"""
+
+<script>
+(function () {{
+  var START_TS = {login_ts};   // Unix epoch seconds, set server-side at login
+  var el = document.getElementById('session-timer');
+
+  function fmt(s) {{
+    if (s < 60)   return 'Active \u00b7 ' + s + 's';
+    if (s < 3600) return 'Active \u00b7 ' + Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+    var h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60);
+    return 'Active \u00b7 ' + h + 'h ' + m + 'm';
+  }}
+
+  function tick() {{
+    var elapsed = Math.max(0, Math.floor(Date.now() / 1000) - START_TS);
+    if (el) el.textContent = fmt(elapsed);
+  }}
+
+  tick();                        // run immediately so there's no blank flash
+  setInterval(tick, 1000);       // then update every second
+}})();
+</script>
+</body>
+</html>"""
 
 with st.sidebar:
     logged_in_user = st.session_state.get("logged_in_user") or "unknown"
     login_ts = float(st.session_state.get("session_start_ts") or datetime.now(timezone.utc).timestamp())
-    st.markdown(
+    # st_components.html runs a real iframe — the only way to execute JS in Streamlit.
+    # height is sized to exactly fit the card (3px bar + ~149px body = 152px).
+    st_components.html(
         user_status_card_html(logged_in_user, current_role(), db_ok, login_ts),
-        unsafe_allow_html=True,
+        height=152,
+        scrolling=False,
     )
 
     if st.button("Logout", use_container_width=True):
