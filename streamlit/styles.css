@@ -99,7 +99,7 @@ div[data-baseweb="select"] * { text-transform: uppercase; }
 footer { visibility: hidden; }
 
 /* KPI boxes */
--row{
+.kpi-row{
   display:flex;
   gap:18px;
   flex-wrap:wrap;
@@ -139,9 +139,9 @@ footer { visibility: hidden; }
 }
 .kpi-number.navy{ color: var(--kpi-num); }
 .kpi-number.cyan{ color: var(--kpi-num); }
--number.lime{ color: var(--kpi-num); }
+.kpi-number.lime{ color: var(--kpi-num); }
 
--sub{
+.kpi-sub{
   margin-top: 4px;
   font-size: 0.78rem;
   color: var(--kpi-num);
@@ -149,7 +149,7 @@ footer { visibility: hidden; }
   letter-spacing: 0.06em;
   font-weight: 900;
 }
--title-below{
+.kpi-title-below{
   margin-top: 10px;
   text-align:center;
   font-size: 0.82rem;
@@ -378,7 +378,7 @@ div[data-testid="stRadio"] label p {
   .kpi-number {
     font-size: 1.4rem !important;
   }
-  -sub {
+  .kpi-sub {
     font-size: 0.65rem !important;
   }
 
