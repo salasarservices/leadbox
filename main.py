@@ -357,7 +357,12 @@ def track_session_activity() -> None:
     if now_ts - last_ts >= INACTIVITY_TIMEOUT_SECONDS:
         logout_user("Logged out due to 30 minutes of inactivity.")
 
+    # Keep last_activity_ts rolling (used for inactivity timeout above)
     st.session_state["last_activity_ts"] = now_ts
+
+    # session_start_ts is set ONCE per login and never overwritten — used for the session timer display
+    if "session_start_ts" not in st.session_state:
+        st.session_state["session_start_ts"] = now_ts
 
 
 def login_gate() -> None:
@@ -1997,7 +2002,10 @@ st.write("")
 # Sidebar
 # -----------------------
 def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float) -> str:
-    initials = "".join(p[0].upper() for p in username.replace(".", " ").replace("_", " ").split() if p)[:2] or "??"
+    # Use the part after the first dot as the "name" (e.g. sal.amit → amit → Ami)
+    # If no dot, use the username itself (e.g. sallead → Sal)
+    _name_part = username.split(".", 1)[1] if "." in username else username
+    initials = (_name_part[:3].title() if _name_part else "??")
     elapsed_s = int(datetime.now(timezone.utc).timestamp() - login_ts)
     if elapsed_s < 60:
         session_label = f"Active · {elapsed_s}s"
@@ -2028,7 +2036,7 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <div style="width:36px;height:36px;border-radius:50%;background:{s['avatar_bg']};
         display:flex;align-items:center;justify-content:center;
-        font-size:13px;font-weight:600;color:{s['avatar_text']};flex-shrink:0;">{initials}</div>
+        font-size:11px;font-weight:700;color:{s['avatar_text']};flex-shrink:0;letter-spacing:0.02em;">{initials}</div>
       <div style="min-width:0;flex:1;">
         <div style="font-size:13px;font-weight:600;color:#0f172a;white-space:nowrap;
           overflow:hidden;text-overflow:ellipsis;">{username}</div>
@@ -2063,7 +2071,7 @@ def user_status_card_html(username: str, role: str, db_ok: bool, login_ts: float
 
 with st.sidebar:
     logged_in_user = st.session_state.get("logged_in_user") or "unknown"
-    login_ts = float(st.session_state.get("last_activity_ts") or datetime.now(timezone.utc).timestamp())
+    login_ts = float(st.session_state.get("session_start_ts") or datetime.now(timezone.utc).timestamp())
     st.markdown(
         user_status_card_html(logged_in_user, current_role(), db_ok, login_ts),
         unsafe_allow_html=True,
