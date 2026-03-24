@@ -631,7 +631,15 @@ def format_edit_history(note: dict) -> str:
 
 def policy_copy_present(lead: dict) -> bool:
     policy_copy = lead.get("policyCopy") or {}
-    return bool(isinstance(policy_copy, dict) and str(policy_copy.get("data") or "").strip())
+    if not isinstance(policy_copy, dict):
+        return False
+    # Check for inline data OR just the filename as an indicator.
+    # policyCopy.data is excluded from the bulk fetch projection, so we fall
+    # back to policyCopy.name which is always fetched.
+    return bool(
+        str(policy_copy.get("data") or "").strip()
+        or str(policy_copy.get("name") or "").strip()
+    )
 
 
 def render_pdf_preview_image(file_bytes: bytes, file_name: str) -> bool:
@@ -670,6 +678,11 @@ def dedupe_notes(notes: list[dict]) -> list[dict]:
 def show_policy_copy_dialog(lead: dict) -> None:
     policy_copy = lead.get("policyCopy") or {}
     encoded = str(policy_copy.get("data") or "").strip()
+    if not encoded and lead.get("_id"):
+        # policyCopy.data was excluded from the bulk projection — fetch it now
+        fresh = leads_col().find_one({"_id": lead["_id"]}, {"policyCopy": 1}) or {}
+        policy_copy = fresh.get("policyCopy") or {}
+        encoded = str(policy_copy.get("data") or "").strip()
     if not encoded:
         st.info("No policy copy uploaded for this lead.")
         return
@@ -860,9 +873,13 @@ def kpi_lead_detail_html(lead: dict) -> str:
 def kpi_counter_script(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
+    # Values are embedded directly so the script string is unique per dataset.
+    # This forces Streamlit to recreate the iframe on every filter/data change,
+    # which re-triggers the animation with the correct current values.
     return f"""
 <script>
 (function() {{
+  var _v = [{total}, {interested}, {not_interested}, {closed}, "{brok}", "{conversion}"];
   function animateCounters() {{
     var root = window.parent.document;
     var els = root.querySelectorAll('.kpi-number[data-target]');
@@ -917,6 +934,7 @@ def mongo_client() -> MongoClient:
 
 def clear_db_cache() -> None:
     st.cache_resource.clear()
+    st.cache_data.clear()
 
 
 def leads_col():
@@ -1141,11 +1159,22 @@ def ensure_indexes():
     if "uniq_leadId" not in existing:
         col.create_index([("leadId", ASCENDING)], unique=True, name="uniq_leadId")
     if "idx_leadDate" not in existing:
-        col.create_index([("leadDate", ASCENDING)], name="idx_leadDate")
+        col.create_index([("leadDate", DESCENDING)], name="idx_leadDate")
     if "idx_leadStatus" not in existing:
         col.create_index([("leadStatus", ASCENDING)], name="idx_leadStatus")
     if "idx_allocatedTo" not in existing:
         col.create_index([("allocatedTo.displayName", ASCENDING)], name="idx_allocatedTo")
+    # Compound indexes covering the two most common filter + sort combinations
+    if "idx_status_date" not in existing:
+        col.create_index(
+            [("leadStatus", ASCENDING), ("leadDate", DESCENDING)],
+            name="idx_status_date",
+        )
+    if "idx_alloc_date" not in existing:
+        col.create_index(
+            [("allocatedTo.displayName", ASCENDING), ("leadDate", DESCENDING)],
+            name="idx_alloc_date",
+        )
 
     ucol = users_col()
     users_existing = ucol.index_information()
@@ -1327,10 +1356,14 @@ def build_query(filters: dict) -> Dict[str, Any]:
     return q
 
 
+@st.cache_data(ttl=30, show_spinner=False)
 def fetch_leads(filters: dict) -> list[dict]:
     col = leads_col()
     q = build_query(filters)
-    docs = list(col.find(q).sort([("leadDate", DESCENDING)]))
+    # Exclude policyCopy.data (heavy base64 binary). It is fetched on-demand
+    # inside show_policy_copy_dialog() when a user opens the policy copy.
+    _PROJECTION = {"policyCopy.data": 0}
+    docs = list(col.find(q, _PROJECTION).sort([("leadDate", DESCENDING)]))
 
     search = (filters.get("search") or "").strip().lower()
     if search:
@@ -1351,6 +1384,14 @@ def fetch_leads(filters: dict) -> list[dict]:
         docs = [d for d in docs if match(d)]
 
     return docs
+
+
+def _invalidate_leads_cache() -> None:
+    """Bust the fetch_leads cache after any write operation."""
+    try:
+        fetch_leads.clear()
+    except Exception:
+        pass
 
 
 def filters_are_active(filters: dict) -> bool:
@@ -1769,6 +1810,7 @@ def update_lead(_id: ObjectId, updates: dict, push_ops: Optional[dict] = None):
     if push_ops:
         update_doc["$push"] = push_ops
     col.update_one({"_id": _id}, update_doc)
+    _invalidate_leads_cache()
 
 
 def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
@@ -1781,6 +1823,7 @@ def add_note(_id: ObjectId, text: str, created_by: Optional[str] = None):
         "editHistory": [],
     }
     col.update_one({"_id": _id}, {"$push": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+    _invalidate_leads_cache()
 
 
 def edit_note(_id: ObjectId, note: dict, new_text: str) -> None:
@@ -1827,6 +1870,7 @@ def edit_note(_id: ObjectId, note: dict, new_text: str) -> None:
                 "$push": {"notes.$.editHistory": edit_entry},
             }
         )
+    _invalidate_leads_cache()
 
 
 def archive_lead(_id: ObjectId) -> None:
@@ -1844,6 +1888,7 @@ def archive_lead(_id: ObjectId) -> None:
         archived_doc.pop("_id", None)
         archive_col.insert_one(archived_doc)
     col.update_one({"_id": _id}, {"$set": {"isArchived": True, "archivedAt": now_utc(), "archivedBy": current_username()}})
+    _invalidate_leads_cache()
 
 
 def restore_lead(archive_id: ObjectId) -> None:
@@ -1860,6 +1905,7 @@ def restore_lead(archive_id: ObjectId) -> None:
             {"$unset": {"isArchived": "", "archivedAt": "", "archivedBy": ""}, "$set": {"updatedAt": now_utc()}}
         )
     archive_col.delete_one({"_id": archive_id})
+    _invalidate_leads_cache()
 
 
 def fetch_archived_leads() -> list[dict]:
@@ -1870,11 +1916,13 @@ def fetch_archived_leads() -> list[dict]:
 def delete_note(_id: ObjectId, note: dict) -> None:
     col = leads_col()
     col.update_one({"_id": _id}, {"$pull": {"notes": note}, "$set": {"updatedAt": now_utc()}})
+    _invalidate_leads_cache()
 
 
 def delete_policy_copy(_id: ObjectId) -> None:
     col = leads_col()
     col.update_one({"_id": _id}, {"$unset": {"policyCopy": ""}, "$set": {"updatedAt": now_utc()}})
+    _invalidate_leads_cache()
 
 
 def create_lead(payload: dict) -> ObjectId:
@@ -1917,6 +1965,7 @@ def create_lead(payload: dict) -> ObjectId:
         }
         try:
             res = col.insert_one(doc)
+            _invalidate_leads_cache()
             return res.inserted_id
         except DuplicateKeyError:
             continue
