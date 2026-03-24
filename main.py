@@ -2247,6 +2247,24 @@ if page == "Leads":
     kpis = compute_kpis_from_docs(leads)
 
     # Show selected-lead details in KPI boxes when a row is chosen; otherwise show aggregate stats.
+    # Sync selected_lead_id with the table widget's actual current selection.
+    # The widget persists its own state in session_state["filtered_leads_table"],
+    # which is the ground truth — prevents stale session state showing lead detail
+    # when no row is visually selected (e.g. after filter changes or deselection).
+    _table_widget_state = st.session_state.get("filtered_leads_table") or {}
+    _table_sel_rows = (
+        _table_widget_state.get("selection", {}).get("rows", [])
+        if isinstance(_table_widget_state, dict) else []
+    )
+    if _table_sel_rows:
+        _sel_idx = _table_sel_rows[0]
+        if 0 <= _sel_idx < len(leads):
+            st.session_state["selected_lead_id"] = leads[_sel_idx].get("leadId")
+        else:
+            st.session_state.pop("selected_lead_id", None)
+    else:
+        st.session_state.pop("selected_lead_id", None)
+
     _selected_lead_id = str(st.session_state.get("selected_lead_id") or "")
     _lead_map_by_id   = {str(d.get("leadId") or ""): d for d in leads}
     _selected_lead    = _lead_map_by_id.get(_selected_lead_id) if _selected_lead_id else None
