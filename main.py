@@ -1447,7 +1447,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
     return df_table, df_download
 
 
-def generate_leads_pdf(df: pd.DataFrame, report_title: str) -> bytes:
+def generate_leads_pdf(df: pd.DataFrame, report_title: str, filters: Optional[dict] = None) -> bytes:
     """Generate a formatted PDF report from the leads download DataFrame."""
     import urllib.request as _urllib_request
 
@@ -1513,13 +1513,55 @@ def generate_leads_pdf(df: pd.DataFrame, report_title: str) -> bytes:
         wordWrap="CJK",
     )
 
+    # ── Build human-readable filter description ──────────────────────────────
+    def _describe_filters(f: dict) -> str:
+        parts: list[str] = []
+        status_val = (f.get("status") or "all").strip()
+        if status_val.lower() != "all":
+            parts.append(f"Status: {status_val.title()}")
+        alloc_val = (f.get("allocatedTo") or "all").strip()
+        if alloc_val.lower() != "all":
+            parts.append(f"Allocated to: {alloc_val}")
+        search_val = (f.get("search") or "").strip()
+        if search_val:
+            parts.append(f'Search: "{search_val}"')
+        mode = (f.get("month_mode") or "all").strip()
+        if mode == "month":
+            m_num  = int(f.get("month_num")  or 1)
+            m_year = int(f.get("month_year") or datetime.now(IST).year)
+            parts.append(f"Period: {MONTHS[m_num - 1]} {m_year}")
+        elif mode == "date range":
+            rs = f.get("range_start")
+            re = f.get("range_end")
+            if rs and re:
+                try:
+                    parts.append(
+                        f"Period: {rs.strftime('%d %b %Y')} \u2013 {re.strftime('%d %b %Y')}"
+                    )
+                except Exception:
+                    pass
+        return "  |  ".join(parts) if parts else "All leads (no filters applied)"
+
+    filter_desc = _describe_filters(filters) if filters else "All leads (no filters applied)"
+
+    filter_style = ParagraphStyle(
+        "lb_filter",
+        parent=styles["Normal"],
+        fontSize=8.5,
+        fontName="Helvetica-Oblique",
+        textColor=_rlcolors.HexColor("#2d448d"),
+        spaceAfter=3,
+    )
+
     story: list = []
 
-    # ── Logo ────────────────────────────────────────────────────────────────
+    # ── Logo (left-aligned, ~200 px wide) ───────────────────────────────────
+    # 200 px at 96 dpi ≈ 5.29 cm; use proportional so height auto-scales
     try:
         with _urllib_request.urlopen(LOGO_URL, timeout=6) as _resp:
             _logo_bytes = _resp.read()
-        logo_img = Image(BytesIO(_logo_bytes), width=3.8 * cm, height=1.4 * cm, kind="proportional")
+        logo_img = Image(BytesIO(_logo_bytes), width=5.3 * cm, kind="proportional")
+        logo_img.hAlign = "LEFT"
         story.append(logo_img)
         story.append(Spacer(1, 0.25 * cm))
     except Exception:
@@ -1528,6 +1570,7 @@ def generate_leads_pdf(df: pd.DataFrame, report_title: str) -> bytes:
     # ── Title block ─────────────────────────────────────────────────────────
     gen_ts = datetime.now(IST).strftime("%d %B %Y  •  %I:%M %p IST")
     story.append(Paragraph(report_title, title_style))
+    story.append(Paragraph(filter_desc, filter_style))
     story.append(
         Paragraph(
             f"Generated: {gen_ts}&nbsp;&nbsp;|&nbsp;&nbsp;Total Records: {len(df)}",
@@ -1672,6 +1715,9 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
         selected_idx = selected_rows[0]
         if 0 <= selected_idx < len(leads):
             st.session_state["selected_lead_id"] = leads[selected_idx].get("leadId")
+    else:
+        # No row selected — clear so KPI row reverts to aggregate stats
+        st.session_state.pop("selected_lead_id", None)
 
 
 def compute_kpis_from_docs(docs: list[dict]) -> dict:
@@ -2242,7 +2288,7 @@ if page == "Leads":
     with st.sidebar:
         card_open("Reports", "lb-navy", "#2d448d", subtitle="Export lead data as PDF")
         try:
-            _pdf_bytes = generate_leads_pdf(_df_download, _pdf_report_title)
+            _pdf_bytes = generate_leads_pdf(_df_download, _pdf_report_title, filters=filters)
             _pdf_filename = f"{download_key}_report_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.pdf"
             st.download_button(
                 "Download PDF Report",
