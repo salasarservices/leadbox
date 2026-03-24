@@ -814,6 +814,49 @@ def kpi_circles_html(total: int, interested: int, not_interested: int, closed: i
 """
 
 
+def kpi_lead_detail_html(lead: dict) -> str:
+    """Renders the KPI row showing selected lead's key details instead of aggregate stats."""
+    lead_id   = lead.get("leadId") or "—"
+    name      = lead.get("contactName") or "—"
+    company   = lead.get("companyName") or "—"
+    alloc     = allocation_chain_text(lead)
+    status    = denormalize_lead_status(lead.get("leadStatus") or "")
+    brokerage = format_inr_compact(parse_money(lead.get("brokerageReceived")) or 0)
+
+    status_palette = LEAD_STATUS_BADGE_STYLES.get(
+        normalize_lead_status(status),
+        {"bg": "#536DFE"},
+    )
+    status_bg = status_palette.get("bg", "#536DFE")
+
+    def _box(bg: str, label: str, value: str) -> str:
+        val_len = len(str(value))
+        fs = "1.0rem" if val_len > 16 else ("1.25rem" if val_len > 10 else "1.5rem")
+        safe_value = str(value).replace("<", "&lt;").replace(">", "&gt;")
+        return (
+            f'<div class="kpi-wrap" style="flex:1;display:flex;flex-direction:column;align-items:center;">'
+            f'<div class="kpi" style="background:{bg};width:100%;height:95px;border-radius:1px;'
+            f'border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;">'
+            f'<div class="kpi-inner" style="text-align:center;padding:6px 8px;">'
+            f'<div style="font-size:{fs};font-weight:900;color:#fff;overflow:hidden;'
+            f'text-overflow:ellipsis;white-space:nowrap;max-width:150px;" title="{safe_value}">{safe_value}</div>'
+            f'<div class="kpi-sub" style="margin-top:4px;font-size:0.72rem;color:rgba(255,255,255,0.85);'
+            f'text-transform:uppercase;letter-spacing:0.06em;font-weight:900;">{label}</div>'
+            f'</div></div></div>'
+        )
+
+    return (
+        '<div class="kpi-row" style="display:flex;gap:12px;padding:10px 2px 6px 2px;align-items:flex-start;">'
+        + _box("var(--pastel-navy)", "Lead ID",      lead_id)
+        + _box("var(--pastel-lime)", "Name",         name)
+        + _box("#FF5252",            "Company",      company)
+        + _box("#8BBA29",            "Allocated To", alloc)
+        + _box(status_bg,            "Status",       status)
+        + _box("#7C4DFF",            "Brokerage",    brokerage)
+        + "</div>"
+    )
+
+
 def kpi_counter_script(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
@@ -1404,6 +1447,192 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
     return df_table, df_download
 
 
+def generate_leads_pdf(df: pd.DataFrame, report_title: str) -> bytes:
+    """Generate a formatted PDF report from the leads download DataFrame."""
+    import urllib.request as _urllib_request
+
+    from reportlab.lib import colors as _rlcolors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.pagesizes import A4, landscape as _landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        HRFlowable,
+        Image,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    _navy   = _rlcolors.HexColor("#2d448d")
+    _lime   = _rlcolors.HexColor("#a6ce39")
+    _row_alt = _rlcolors.HexColor("#eef3ff")
+    _border = _rlcolors.HexColor("#d1d9f0")
+    _grey_text = _rlcolors.HexColor("#64748b")
+
+    PAGE_W, PAGE_H = _landscape(A4)
+    MARGIN = 1.5 * cm
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=_landscape(A4),
+        leftMargin=MARGIN,
+        rightMargin=MARGIN,
+        topMargin=MARGIN,
+        bottomMargin=2 * cm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "lb_title",
+        parent=styles["Normal"],
+        fontSize=20,
+        fontName="Helvetica-Bold",
+        textColor=_navy,
+        spaceAfter=2,
+        leading=24,
+    )
+    sub_style = ParagraphStyle(
+        "lb_sub",
+        parent=styles["Normal"],
+        fontSize=8.5,
+        fontName="Helvetica",
+        textColor=_grey_text,
+        spaceAfter=4,
+    )
+    cell_style = ParagraphStyle(
+        "lb_cell",
+        parent=styles["Normal"],
+        fontSize=7.5,
+        fontName="Helvetica",
+        textColor=_rlcolors.HexColor("#1e293b"),
+        leading=10,
+        wordWrap="CJK",
+    )
+
+    story: list = []
+
+    # ── Logo ────────────────────────────────────────────────────────────────
+    try:
+        with _urllib_request.urlopen(LOGO_URL, timeout=6) as _resp:
+            _logo_bytes = _resp.read()
+        logo_img = Image(BytesIO(_logo_bytes), width=3.8 * cm, height=1.4 * cm, kind="proportional")
+        story.append(logo_img)
+        story.append(Spacer(1, 0.25 * cm))
+    except Exception:
+        pass  # Logo fetch failed — continue without it
+
+    # ── Title block ─────────────────────────────────────────────────────────
+    gen_ts = datetime.now(IST).strftime("%d %B %Y  •  %I:%M %p IST")
+    story.append(Paragraph(report_title, title_style))
+    story.append(
+        Paragraph(
+            f"Generated: {gen_ts}&nbsp;&nbsp;|&nbsp;&nbsp;Total Records: {len(df)}",
+            sub_style,
+        )
+    )
+    story.append(
+        HRFlowable(
+            width="100%",
+            thickness=2,
+            color=_navy,
+            spaceAfter=8,
+            spaceBefore=2,
+        )
+    )
+
+    # ── Table ────────────────────────────────────────────────────────────────
+    _display_cols = [
+        "Number", "Lead ID", "Name", "Company",
+        "Allocated To", "Status", "Brokerage Received",
+        "Phone Number", "Email",
+    ]
+    _present = [c for c in _display_cols if c in df.columns]
+    df_view = df[_present]
+
+    # Wrap long cell text in Paragraphs so reportlab can reflow
+    header_row = [
+        Paragraph(
+            f'<font name="Helvetica-Bold" color="white" size="8">{col.upper()}</font>',
+            ParagraphStyle("hdr", alignment=TA_CENTER),
+        )
+        for col in df_view.columns
+    ]
+    data_rows = []
+    for _, row in df_view.iterrows():
+        data_rows.append(
+            [Paragraph(str(v) if v is not None else "", cell_style) for v in row]
+        )
+    table_data = [header_row] + data_rows
+
+    # Column widths — landscape A4 usable width ≈ 26.7 cm
+    col_w_map = {
+        "Number":            1.1 * cm,
+        "Lead ID":           2.3 * cm,
+        "Name":              3.8 * cm,
+        "Company":           4.5 * cm,
+        "Allocated To":      3.8 * cm,
+        "Status":            2.2 * cm,
+        "Brokerage Received":2.6 * cm,
+        "Phone Number":      2.8 * cm,
+        "Email":             4.0 * cm,
+    }
+    col_widths = [col_w_map.get(c, 3 * cm) for c in df_view.columns]
+
+    tbl = Table(table_data, colWidths=col_widths, repeatRows=1)
+    tbl.setStyle(
+        TableStyle([
+            # Header background
+            ("BACKGROUND",    (0, 0), (-1, 0),  _navy),
+            ("TEXTCOLOR",     (0, 0), (-1, 0),  _rlcolors.white),
+            ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
+            ("FONTSIZE",      (0, 0), (-1, 0),  8),
+            ("ALIGN",         (0, 0), (-1, 0),  "CENTER"),
+            ("VALIGN",        (0, 0), (-1, 0),  "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, 0),  7),
+            ("BOTTOMPADDING", (0, 0), (-1, 0),  7),
+            # Accent line below header
+            ("LINEBELOW",     (0, 0), (-1, 0),  2, _lime),
+            # Data rows
+            ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE",      (0, 1), (-1, -1), 7.5),
+            ("ROWBACKGROUNDS",(0, 1), (-1, -1), [_rlcolors.white, _row_alt]),
+            ("VALIGN",        (0, 1), (-1, -1), "TOP"),
+            ("TOPPADDING",    (0, 1), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 5),
+            # Grid lines
+            ("GRID",          (0, 0), (-1, -1), 0.4, _border),
+            ("LINEBELOW",     (0, -1), (-1, -1), 1,  _navy),
+        ])
+    )
+    story.append(tbl)
+
+    # ── Footer on every page ────────────────────────────────────────────────
+    def _add_footer(canvas, doc_obj):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(_grey_text)
+        canvas.drawString(MARGIN, 0.9 * cm, "LeadBox — Salasar Services  |  Confidential")
+        canvas.drawRightString(
+            PAGE_W - MARGIN,
+            0.9 * cm,
+            f"Page {doc_obj.page}",
+        )
+        canvas.setStrokeColor(_border)
+        canvas.setLineWidth(0.5)
+        canvas.line(MARGIN, 1.25 * cm, PAGE_W - MARGIN, 1.25 * cm)
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=_add_footer, onLaterPages=_add_footer)
+    buf.seek(0)
+    return buf.read()
+
+
 def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, download_label: str) -> None:
     if not leads:
         st.info("No leads found.")
@@ -1970,14 +2199,23 @@ if page == "Leads":
     is_filtered = filters_are_active(filters)
 
     kpis = compute_kpis_from_docs(leads)
-    st.markdown(
-        kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
-        unsafe_allow_html=True,
-    )
-    st_components.html(
-        kpi_counter_script(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
-        height=0,
-    )
+
+    # Show selected-lead details in KPI boxes when a row is chosen; otherwise show aggregate stats.
+    _selected_lead_id = str(st.session_state.get("selected_lead_id") or "")
+    _lead_map_by_id   = {str(d.get("leadId") or ""): d for d in leads}
+    _selected_lead    = _lead_map_by_id.get(_selected_lead_id) if _selected_lead_id else None
+
+    if _selected_lead:
+        st.markdown(kpi_lead_detail_html(_selected_lead), unsafe_allow_html=True)
+    else:
+        st.markdown(
+            kpi_circles_html(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
+            unsafe_allow_html=True,
+        )
+        st_components.html(
+            kpi_counter_script(kpis["total"], kpis["interested"], kpis["not_interested"], kpis["closed"], kpis["total_brokerage"]),
+            height=0,
+        )
 
     table_title = "Filtered Leads" if is_filtered else "Leads"
     if filters.get("month_mode") == "date range":
@@ -1997,6 +2235,26 @@ if page == "Leads":
         download_label=download_label,
     )
     card_close()
+
+    # ── PDF Report sidebar button ─────────────────────────────────────────────
+    _, _df_download = build_leads_table_frames(leads)
+    _pdf_report_title = ("Filtered Leads Report" if is_filtered else "Leads Report")
+    with st.sidebar:
+        card_open("Reports", "lb-navy", "#2d448d", subtitle="Export lead data as PDF")
+        try:
+            _pdf_bytes = generate_leads_pdf(_df_download, _pdf_report_title)
+            _pdf_filename = f"{download_key}_report_{datetime.now(IST).strftime('%Y%m%d_%H%M%S')}.pdf"
+            st.download_button(
+                "Download PDF Report",
+                data=_pdf_bytes,
+                file_name=_pdf_filename,
+                mime="application/pdf",
+                use_container_width=True,
+                key="pdf_report_btn",
+            )
+        except Exception as _pdf_err:
+            st.error(f"PDF generation failed: {_pdf_err}")
+        card_close()
 
     left, right = st.columns([0.45, 0.55])
 
