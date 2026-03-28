@@ -1,64 +1,76 @@
-# LeadBox — Project Notes (Decisions & Behaviors)
+# LeadBox — Project Notes
 
 ## Overview
-- App: **LeadBox** (Streamlit)
-- Database: MongoDB
-  - `DB_NAME = "sal-leads"`
-  - Collection: `leads`
-- Timezone: **IST** (`Asia/Kolkata`) used for lead-date UI and month logic.
 
-## Lead ID rules
-- Format: `SalLeadNNMMMYY` (example: `SalLead04FEB26`)
-- Serial resets **monthly** based on selected **Lead Date (IST)**
-- Stored field: `legacyNumber` = the monthly serial (1..n)
+LeadBox is an internal lead management application built with Streamlit, backed by a NoSQL document database. All runtime configuration (database URI, credentials, environment identifiers) is managed via environment secrets and must never be committed to version control.
 
-## Lead Date behavior
-- Lead Date is editable on the **Leads** page.
-- If Lead Date month/year changes, the system regenerates:
-  - `leadId`
-  - `legacyNumber`
+- **Framework:** Streamlit
+- **Database:** MongoDB
+- **Timezone:** IST (Asia/Kolkata) — used for all date-related UI logic and monthly calculations
 
-## Create Lead page behavior
-- After creating a lead:
-  - Show only: `Lead created: <leadId>`
-  - Do **not** show raw JSON / debug document output.
+---
 
-## Leads page behavior
+## Lead Identification
 
-### Lead picker label
-- Show: `LEADID — CONTACTNAME [STATUS]`
-- Do **not** show company name in the picker label.
+- Each lead is assigned a unique, human-readable ID upon creation.
+- The ID encodes a monthly serial number derived from the **Lead Date** (IST).
+- The serial counter resets at the start of each calendar month.
+- If the Lead Date is changed to a different month or year, the system automatically regenerates the lead's ID and its monthly serial to remain consistent.
 
-### Edit form fields
-- Includes Lead Date calendar (IST).
-- Includes **Comments (optional)** field.
-  - Comments are stored as **notes** (history preserved).
-  - Editing/saving comments appends a new note entry.
+---
 
-### Refresh DB
-- Sidebar button: **Refresh DB**
-- Clears only the cached DB connection (Mongo client cache).
-- Does **not** force an app rerun that could trigger login again.
+## Page Behaviors
 
-### Month-wise graph
-- Beautiful “month-wise leads received” graph (Plotly).
-- Shows a continuous month series from the **first month present in DB** (e.g., `JUL 25`) up to the current month.
-- X-axis labels: `JUL 25`, `AUG 25`, `SEP 25`, ...
+### Create Lead
 
-### Filter-triggered leads table
-- Show a clean, scrollable table **only when filtering by**:
-  - Status, or
-  - Allocated To, or
-  - Filter by Month
-- Table columns (no notes/comments):
-  - Name, Company, Phone, Email, Allocated To, Status (+ Lead ID)
+- On successful creation, the UI displays the newly assigned Lead ID only.
+- Raw database documents or debug output are never shown to the user.
 
-### UI highlight
-- “Select a lead” dropdown is visually highlighted via a CSS wrapper class:
-  - `.lb-lead-picker`
+### Leads
+
+#### Lead Selector
+- Each lead is listed as: `LEAD ID — Contact Name [Status]`
+- Company name is intentionally omitted from the selector label to reduce visual clutter.
+
+#### Edit Form
+- Includes an IST-aware Lead Date picker.
+- Includes an optional Comments field.
+  - Comments are appended as timestamped history entries; prior entries are never overwritten.
+
+#### Refresh Connection
+- A **Refresh DB** button in the sidebar clears the cached database connection.
+- This does not trigger a full app rerun or force re-authentication.
+
+#### Month-wise Analytics Graph
+- Displays lead volume per calendar month using a continuous date series.
+- The series starts from the earliest month present in the dataset and extends to the current month.
+- Rendered with Plotly.
+
+#### Filtered Leads Table
+- A leads table is rendered only when an active filter is applied (by Status, Assigned User, or Month).
+- Visible columns: Name, Company, Phone, Email, Assigned To, Status, Lead ID.
+- Notes and internal metadata are excluded from this view.
+
+---
 
 ## Dependencies
-If using Plotly graph:
-- Add/keep in `requirements.txt`:
-  - `plotly>=5.18,<6`
-  - plus existing: `streamlit`, `pymongo`, `dnspython`, `pandas`
+
+Defined in `requirements.txt`. Key packages:
+
+| Package | Purpose |
+|---|---|
+| `streamlit` | UI framework |
+| `pymongo` + `dnspython` | MongoDB connectivity |
+| `pandas` | Data manipulation |
+| `plotly` | Interactive charts |
+| `pypdfium2` + `reportlab` | PDF processing and generation |
+
+Version ranges are pinned in `requirements.txt`. Review for CVEs periodically.
+
+---
+
+## Security Notes
+
+- All secrets (database URI, auth credentials) are injected at runtime via Streamlit's secrets management or environment variables — never hardcoded.
+- `.streamlit/secrets.toml` and any `.env` files must be listed in `.gitignore`.
+- This file must not contain database names, collection identifiers, field names, ID formats, or any information that reveals internal data structure.
