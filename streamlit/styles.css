@@ -193,6 +193,100 @@ footer { visibility: hidden; }
   letter-spacing: 0.02em;
 }
 
+/* ── SELECT LEAD bar ─────────────────────────────────────────────────────── */
+.lb-select-lead-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+/* ── Lead Summary Panel ──────────────────────────────────────────────────── */
+.lb-lead-summary-panel {
+  background: #1a2e52;
+  padding: 16px 14px 20px 14px;
+  min-height: 500px;
+}
+
+.lb-ls-header {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 10px;
+}
+
+.lb-ls-lead-id {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+
+.lb-ls-created {
+  font-size: 0.74rem;
+  color: rgba(255, 255, 255, 0.4);
+  margin-top: 4px;
+  margin-bottom: 12px;
+}
+
+.lb-ls-sep {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 6px 0 14px 0;
+}
+
+.lb-ls-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 11px;
+}
+
+.lb-ls-key {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.42);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.lb-ls-val {
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #ffffff;
+  word-break: break-word;
+}
+
+.lb-ls-email {
+  font-size: 0.75rem !important;
+  word-break: break-all;
+}
+
+.lb-ls-status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+  width: fit-content;
+}
+
+/* ── Edit form title ─────────────────────────────────────────────────────── */
+.lb-edit-form-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--navy);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(45, 68, 141, 0.18);
+}
+
 /* Read-only comments section */
 .lb-comments-view{
   background: var(--pastel-lime);

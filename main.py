@@ -2418,10 +2418,11 @@ if page == "Leads":
             st.error(f"PDF generation failed: {_pdf_err}")
         card_close()
 
-    left, right = st.columns([0.45, 0.55])
+    left, right = st.columns([0.62, 0.38])
 
     with left:
-        card_open("Details", "lb-navy", "#2d448d", subtitle="Select a lead to view or edit")
+        # ── SELECT LEAD bar ───────────────────────────────────────────────────
+        st.markdown('<div class="lb-select-lead-label">SELECT LEAD</div>', unsafe_allow_html=True)
 
         def lead_label(d: dict) -> str:
             lid = d.get("leadId") or "?"
@@ -2433,7 +2434,6 @@ if page == "Leads":
         lead_map = {lead_label(d): d for d in leads}
         lead_index_by_id = {str(d.get("leadId") or ""): idx for idx, d in enumerate(leads)}
 
-        st.markdown('<div class="lb-lead-picker-title">Select a lead</div>', unsafe_allow_html=True)
         if lead_options:
             default_idx = 0
             selected_lead_id = str(st.session_state.get("selected_lead_id") or "")
@@ -2465,65 +2465,104 @@ if page == "Leads":
             existing_notes = dedupe_notes(lead.get("notes") or [])
             existing_comment_default = (existing_notes[-1].get("text") if existing_notes else "") or ""
 
-            c1, c2 = st.columns(2)
+            # Pre-compute allocation options (needed in both panels)
+            current_status_label = denormalize_lead_status(lead.get("leadStatus"))
+            status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
 
-            with c1:
-                leadDateEdit = st.date_input(
-                    "Lead date (IST)",
-                    value=existing_date_ist,
-                    key=f"edit_lead_date_{lead.get('leadId')}",
-                )
-                companyName = st.text_input(
-                    "Company",
-                    value=lead.get("companyName") or "",
-                    key=f"edit_company_{lead.get('leadId')}",
-                )
-                contactName = st.text_input(
-                    "Contact person",
-                    value=lead.get("contactName") or "",
-                    key=f"edit_contact_name_{lead.get('leadId')}",
-                )
-                contactEmail = st.text_input(
-                    "Email id",
-                    value=lead.get("contactEmail") or "",
-                    key=f"edit_contact_email_{lead.get('leadId')}",
-                )
-                contactPhone = st.text_input(
-                    "Phone number",
-                    value=lead.get("contactPhone") or "",
-                    key=f"edit_contact_phone_{lead.get('leadId')}",
-                )
+            alloc_opts = allocated_to_suggestions()
+            current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+            alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
+            if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
+                alloc_options.insert(2, current_alloc)
+            alloc_index = 0
+            if current_alloc:
+                try:
+                    alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
+                except ValueError:
+                    alloc_index = 0
 
-            with c2:
-                current_status_label = denormalize_lead_status(lead.get("leadStatus"))
-                status_index = LEAD_STATUS_OPTIONS.index(current_status_label) if current_status_label in LEAD_STATUS_OPTIONS else 0
-                leadStatusLabel = st.selectbox(
-                    "Lead status",
-                    LEAD_STATUS_OPTIONS,
-                    index=status_index,
-                    key=f"edit_status_{lead.get('leadId')}",
-                )
+            # ── Two-panel layout: Lead Summary | Edit Form ────────────────────
+            summary_col, form_col = st.columns([0.30, 0.70])
 
-                alloc_opts = allocated_to_suggestions()
-                current_alloc = (safe_get(lead, "allocatedTo.displayName") or "").strip()
+            with summary_col:
+                _lead_id_disp  = lead.get("leadId") or "—"
+                _date_disp     = existing_date_ist.strftime("%Y/%m/%d") if existing_date_ist else "—"
+                _status_raw    = (lead.get("leadStatus") or "fresh").lower()
+                _status_disp   = denormalize_lead_status(lead.get("leadStatus") or "") or "Fresh"
+                _contact_disp  = lead.get("contactName") or "—"
+                _phone_disp    = lead.get("contactPhone") or "—"
+                _email_disp    = lead.get("contactEmail") or "—"
+                _alloc_disp    = (safe_get(lead, "allocatedTo.displayName") or "").strip() or "—"
+                _broker_disp   = str(lead.get("brokerageReceived")) if lead.get("brokerageReceived") is not None else "—"
+                _status_colors = {"fresh": "#3b82f6", "allocated": "#f59e0b", "interested": "#10b981", "lost": "#ef4444", "closed": "#8bc34a"}
+                _badge_bg      = _status_colors.get(_status_raw, "#3b82f6")
 
-                alloc_options = ["None", "(TYPE NEW)"] + alloc_opts
-                if current_alloc and current_alloc.lower() not in {a.lower() for a in alloc_options}:
-                    alloc_options.insert(2, current_alloc)
+                st.markdown(f"""
+                <div class="lb-lead-summary-panel">
+                    <div class="lb-ls-header">LEAD SUMMARY</div>
+                    <div class="lb-ls-lead-id">{_lead_id_disp}</div>
+                    <div class="lb-ls-created">Created {_date_disp}</div>
+                    <div class="lb-ls-sep"></div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Status</span>
+                        <span class="lb-ls-status-badge" style="background:{_badge_bg}">{_status_disp.upper()}</span>
+                    </div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Contact</span>
+                        <span class="lb-ls-val">{_contact_disp}</span>
+                    </div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Phone</span>
+                        <span class="lb-ls-val">{_phone_disp}</span>
+                    </div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Email</span>
+                        <span class="lb-ls-val lb-ls-email">{_email_disp}</span>
+                    </div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Allocated to</span>
+                        <span class="lb-ls-val">{_alloc_disp}</span>
+                    </div>
+                    <div class="lb-ls-row">
+                        <span class="lb-ls-key">Brokerage</span>
+                        <span class="lb-ls-val">{_broker_disp}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-                alloc_index = 0
-                if current_alloc:
-                    try:
-                        alloc_index = [a.lower() for a in alloc_options].index(current_alloc.lower())
-                    except ValueError:
-                        alloc_index = 0
+            with form_col:
+                st.markdown('<div class="lb-edit-form-title">Edit lead details</div>', unsafe_allow_html=True)
 
-                allocPick = st.selectbox(
-                    "Allocated to (choose)",
-                    alloc_options,
-                    index=alloc_index,
-                    key=f"edit_alloc_pick_{lead.get('leadId')}",
-                )
+                fc1, fc2 = st.columns(2)
+                with fc1:
+                    leadStatusLabel = st.selectbox(
+                        "Lead status",
+                        LEAD_STATUS_OPTIONS,
+                        index=status_index,
+                        key=f"edit_status_{lead.get('leadId')}",
+                    )
+                with fc2:
+                    leadDateEdit = st.date_input(
+                        "Lead date",
+                        value=existing_date_ist,
+                        key=f"edit_lead_date_{lead.get('leadId')}",
+                    )
+
+                fc3, fc4 = st.columns(2)
+                with fc3:
+                    companyName = st.text_input(
+                        "Company",
+                        value=lead.get("companyName") or "",
+                        key=f"edit_company_{lead.get('leadId')}",
+                    )
+                with fc4:
+                    allocPick = st.selectbox(
+                        "Allocated to",
+                        alloc_options,
+                        index=alloc_index,
+                        key=f"edit_alloc_pick_{lead.get('leadId')}",
+                    )
+
                 allocTyped = st.text_input(
                     "Or type allocated to (adds new)",
                     value="",
@@ -2532,145 +2571,163 @@ if page == "Leads":
                 )
                 allocatedToDisplayName = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
 
-            brokerage = st.text_input(
-                "Brokerage received",
-                value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
-                key=f"edit_brokerage_{lead.get('leadId')}",
-            )
+                fc5, fc6 = st.columns(2)
+                with fc5:
+                    contactName = st.text_input(
+                        "Contact person",
+                        value=lead.get("contactName") or "",
+                        key=f"edit_contact_name_{lead.get('leadId')}",
+                    )
+                with fc6:
+                    contactEmail = st.text_input(
+                        "Email id",
+                        value=lead.get("contactEmail") or "",
+                        key=f"edit_contact_email_{lead.get('leadId')}",
+                    )
 
-            original_status_label = denormalize_lead_status(lead.get("leadStatus"))
-            show_closed_fields = leadStatusLabel == "Closed"
-            is_newly_marked_closed = original_status_label != "Closed" and show_closed_fields
-
-            net_premium = ""
-            if show_closed_fields:
-                net_premium = st.text_input(
-                    "Net Premium",
-                    value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
-                    key=f"edit_net_premium_{lead.get('leadId')}",
+                contactPhone = st.text_input(
+                    "Phone number",
+                    value=lead.get("contactPhone") or "",
+                    key=f"edit_contact_phone_{lead.get('leadId')}",
                 )
-            uploaded_policy_copy = None
-            if show_closed_fields:
-                if is_newly_marked_closed:
-                    st.info("This lead will now require net premium details and a policy copy before saving as Closed.")
-                uploaded_policy_copy = st.file_uploader(
-                    "Policy Copy",
-                    type=["pdf", "png", "jpg", "jpeg", "webp"],
-                    help="Upload the issued policy copy for closed leads.",
-                    key=f"policy_copy_upload_{lead.get('leadId')}",
+
+                brokerage = st.text_input(
+                    "Brokerage received",
+                    value="" if lead.get("brokerageReceived") is None else str(lead.get("brokerageReceived")),
+                    key=f"edit_brokerage_{lead.get('leadId')}",
                 )
-                if policy_copy_present(lead):
-                    existing_policy = lead.get("policyCopy") or {}
-                    st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
-            else:
-                st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
-            comment_edit = ""
+                original_status_label = denormalize_lead_status(lead.get("leadStatus"))
+                show_closed_fields = leadStatusLabel == "Closed"
+                is_newly_marked_closed = original_status_label != "Closed" and show_closed_fields
 
-            st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
-
-            if can_edit_leads():
-                save = st.button("Save changes", key=f"save_lead_{lead.get('leadId')}", use_container_width=True)
-            else:
-                st.info("You have view-only access. Contact an admin to make changes.")
-                save = False
-
-            if save:
-                # ---- Money parsing ----
-                brokerage_val: Any = brokerage.strip()
-                if brokerage_val == "":
-                    brokerage_val = None
+                net_premium = ""
+                if show_closed_fields:
+                    net_premium = st.text_input(
+                        "Net Premium",
+                        value="" if lead.get("netPremium") is None else str(lead.get("netPremium")),
+                        key=f"edit_net_premium_{lead.get('leadId')}",
+                    )
+                uploaded_policy_copy = None
+                if show_closed_fields:
+                    if is_newly_marked_closed:
+                        st.info("This lead will now require net premium details and a policy copy before saving as Closed.")
+                    uploaded_policy_copy = st.file_uploader(
+                        "Policy Copy",
+                        type=["pdf", "png", "jpg", "jpeg", "webp"],
+                        help="Upload the issued policy copy for closed leads.",
+                        key=f"policy_copy_upload_{lead.get('leadId')}",
+                    )
+                    if policy_copy_present(lead):
+                        existing_policy = lead.get("policyCopy") or {}
+                        st.caption(f"Existing file: {existing_policy.get('name') or 'Policy copy uploaded'}")
                 else:
-                    try:
-                        brokerage_val = float(brokerage_val)
-                    except ValueError:
-                        st.error("Brokerage must be a number (or empty).")
-                        st.stop()
+                    st.caption("Policy copy upload available only when status is Closed.")
 
-                net_premium_val: Any = net_premium.strip()
-                if net_premium_val == "":
-                    net_premium_val = None
+                comment_edit = ""
+
+                st.caption("Lead date defaults to current date unless you change it. Lead ID remains unchanged when updating or re-assigning an existing lead.")
+
+                if can_edit_leads():
+                    save = st.button("Save changes", key=f"save_lead_{lead.get('leadId')}", use_container_width=True)
                 else:
-                    try:
-                        net_premium_val = float(net_premium_val)
-                    except ValueError:
-                        st.error("Net Premium must be a number (or empty).")
-                        st.stop()
+                    st.info("You have view-only access. Contact an admin to make changes.")
+                    save = False
 
-                policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatusLabel == "Closed" else None
+                if save:
+                    # ---- Money parsing ----
+                    brokerage_val: Any = brokerage.strip()
+                    if brokerage_val == "":
+                        brokerage_val = None
+                    else:
+                        try:
+                            brokerage_val = float(brokerage_val)
+                        except ValueError:
+                            st.error("Brokerage must be a number (or empty).")
+                            st.stop()
 
-                # ---- Lead date update (Lead ID stays unchanged for existing leads) ----
-                updated_lead_dt_ist = datetime(
-                    leadDateEdit.year,
-                    leadDateEdit.month,
-                    leadDateEdit.day,
-                    0,
-                    0,
-                    0,
-                    tzinfo=IST,
-                )
+                    net_premium_val: Any = net_premium.strip()
+                    if net_premium_val == "":
+                        net_premium_val = None
+                    else:
+                        try:
+                            net_premium_val = float(net_premium_val)
+                        except ValueError:
+                            st.error("Net Premium must be a number (or empty).")
+                            st.stop()
 
-                # ---- Updates ----
-                updates: dict = {
-                    "leadDate": updated_lead_dt_ist.astimezone(timezone.utc),
-                    "companyName": companyName.strip() or None,
-                    "contactName": contactName.strip() or None,
-                    "contactEmail": contactEmail.strip() or None,
-                    "contactPhone": contactPhone.strip() or None,
-                    "leadStatus": normalize_lead_status(leadStatusLabel),
-                    "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
-                    "brokerageReceived": brokerage_val,
-                    "netPremium": net_premium_val,
-                    "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
-                }
-                current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
-                previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
-                next_alloc = (allocatedToDisplayName or "").strip() or None
-                allocation_push = None
-                if previous_alloc and next_alloc and previous_alloc.lower() != next_alloc.lower():
-                    allocation_push = {
-                        "allocationHistory": {
-                            "from": previous_alloc,
-                            "to": next_alloc,
-                            "editedAt": now_utc(),
-                            "editedBy": current_username(),
-                        }
+                    policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatusLabel == "Closed" else None
+
+                    # ---- Lead date update (Lead ID stays unchanged for existing leads) ----
+                    updated_lead_dt_ist = datetime(
+                        leadDateEdit.year,
+                        leadDateEdit.month,
+                        leadDateEdit.day,
+                        0,
+                        0,
+                        0,
+                        tzinfo=IST,
+                    )
+
+                    # ---- Updates ----
+                    updates: dict = {
+                        "leadDate": updated_lead_dt_ist.astimezone(timezone.utc),
+                        "companyName": companyName.strip() or None,
+                        "contactName": contactName.strip() or None,
+                        "contactEmail": contactEmail.strip() or None,
+                        "contactPhone": contactPhone.strip() or None,
+                        "leadStatus": normalize_lead_status(leadStatusLabel),
+                        "allocatedTo": {"displayName": allocatedToDisplayName, "userId": None, "email": None},
+                        "brokerageReceived": brokerage_val,
+                        "netPremium": net_premium_val,
+                        "policyCopy": policy_copy_doc if leadStatusLabel == "Closed" and policy_copy_doc else (lead.get("policyCopy") if leadStatusLabel == "Closed" else None),
                     }
+                    current_db_doc = leads_col().find_one({"_id": lead_oid}, {"allocatedTo.displayName": 1}) or {}
+                    previous_alloc = (safe_get(current_db_doc, "allocatedTo.displayName") or "").strip() or None
+                    next_alloc = (allocatedToDisplayName or "").strip() or None
+                    allocation_push = None
+                    if previous_alloc and next_alloc and previous_alloc.lower() != next_alloc.lower():
+                        allocation_push = {
+                            "allocationHistory": {
+                                "from": previous_alloc,
+                                "to": next_alloc,
+                                "editedAt": now_utc(),
+                                "editedBy": current_username(),
+                            }
+                        }
 
-                with db_loader("Saving lead..."):
-                    try:
-                        update_lead(lead_oid, updates, push_ops=allocation_push)
-                    except DuplicateKeyError:
-                        st.error("Lead ID collision occurred. Try saving again.")
-                        st.stop()
+                    with db_loader("Saving lead..."):
+                        try:
+                            update_lead(lead_oid, updates, push_ops=allocation_push)
+                        except DuplicateKeyError:
+                            st.error("Lead ID collision occurred. Try saving again.")
+                            st.stop()
 
-                    if (comment_edit or "").strip():
-                        add_note(lead_oid, comment_edit.strip(), created_by=current_username())
+                        if (comment_edit or "").strip():
+                            add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
-                st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
+                    st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
 
-            selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
-            if selected_status == "Closed" and policy_copy_present(selected_lead):
-                if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
-                    show_policy_copy_dialog(selected_lead)
-                if is_admin():
-                    if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
-                        with db_loader("Deleting policy copy..."):
-                            delete_policy_copy(lead_oid)
-                        st.success("Policy copy deleted.")
+                selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
+                if selected_status == "Closed" and policy_copy_present(selected_lead):
+                    if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
+                        show_policy_copy_dialog(selected_lead)
+                    if is_admin():
+                        if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
+                            with db_loader("Deleting policy copy..."):
+                                delete_policy_copy(lead_oid)
+                            st.success("Policy copy deleted.")
+                            st.rerun()
+
+                if can_manage_deletions():
+                    st.markdown("---")
+                    st.caption("Admin only")
+                    if st.button("Archive this lead", key=f"archive_lead_{lead.get('leadId')}"):
+                        with db_loader("Archiving lead..."):
+                            archive_lead(lead_oid)
+                        st.session_state.pop("selected_lead_id", None)
+                        st.success("Lead archived. View it under 'Archived Leads'.")
                         st.rerun()
-
-            if can_manage_deletions():
-                st.markdown("---")
-                st.caption("Admin only")
-                if st.button("Archive this lead", key=f"archive_lead_{lead.get('leadId')}"):
-                    with db_loader("Archiving lead..."):
-                        archive_lead(lead_oid)
-                    st.session_state.pop("selected_lead_id", None)
-                    st.success("Lead archived. View it under 'Archived Leads'.")
-                    st.rerun()
-
-        card_close()
 
     with right:
         try:
