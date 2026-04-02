@@ -302,20 +302,11 @@ footer { visibility: hidden; }
 }
 
 /* ── Summary column: extend dark navy bg to cover the policy buttons ─────── */
-[data-testid="stColumn"]:has(.lb-lead-summary-panel) {
+/* Target only stElementContainers that are siblings of the panel container,
+   scoped within the same stVerticalBlock (the summary_col content area) */
+.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
   background: #1a2e52;
-  padding-bottom: 14px;
-}
-[data-testid="stColumn"]:has(.lb-lead-summary-panel) > div {
-  background: #1a2e52;
-}
-[data-testid="stColumn"]:has(.lb-lead-summary-panel) .stElementContainer {
-  background: #1a2e52;
-  padding-left: 14px;
-  padding-right: 14px;
-}
-[data-testid="stColumn"]:has(.lb-lead-summary-panel) .lb-lead-summary-panel {
-  padding-bottom: 12px;
+  padding: 4px 14px 8px 14px;
 }
 
 /* Read-only comments section */
