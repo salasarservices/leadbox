@@ -301,10 +301,21 @@ footer { visibility: hidden; }
   border-bottom: 2px solid rgba(45, 68, 141, 0.18);
 }
 
-/* ── Delete Policy Copy button — red ─────────────────────────────────────── */
-.stColumn:has(.lb-del-policy-marker) button {
-  background-color: var(--kpi-lost) !important;
-  border-color: var(--kpi-lost) !important;
+/* ── Summary column: extend dark navy bg to cover the policy buttons ─────── */
+[data-testid="stColumn"]:has(.lb-lead-summary-panel) {
+  background: #1a2e52;
+  padding-bottom: 14px;
+}
+[data-testid="stColumn"]:has(.lb-lead-summary-panel) > div {
+  background: #1a2e52;
+}
+[data-testid="stColumn"]:has(.lb-lead-summary-panel) .stElementContainer {
+  background: #1a2e52;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+[data-testid="stColumn"]:has(.lb-lead-summary-panel) .lb-lead-summary-panel {
+  padding-bottom: 12px;
 }
 
 /* Read-only comments section */

@@ -2500,7 +2500,7 @@ if page == "Leads":
                 st.markdown(f"""
                 <div class="lb-lead-summary-panel">
                     <div class="lb-ls-header">LEAD SUMMARY</div>
-                    <div class="lb-ls-lead-id">{_lead_id_disp}</div>
+                    <div class="lb-ls-lead-id">{_contact_disp}</div>
                     <div class="lb-ls-created">Created {_date_disp}</div>
                     <div class="lb-ls-sep"></div>
                     <div class="lb-ls-row">
@@ -2508,8 +2508,8 @@ if page == "Leads":
                         <span class="lb-ls-status-badge" style="background:{_badge_bg}">{_status_disp.upper()}</span>
                     </div>
                     <div class="lb-ls-row">
-                        <span class="lb-ls-key">Contact</span>
-                        <span class="lb-ls-val">{_contact_disp}</span>
+                        <span class="lb-ls-key">Lead ID</span>
+                        <span class="lb-ls-val">{_lead_id_disp}</span>
                     </div>
                     <div class="lb-ls-row">
                         <span class="lb-ls-key">Phone</span>
@@ -2529,6 +2529,18 @@ if page == "Leads":
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # Policy copy buttons inside the summary column
+                _sel_status = denormalize_lead_status(lead.get("leadStatus"))
+                if _sel_status == "Closed" and policy_copy_present(lead):
+                    if st.button("View Policy", use_container_width=True, key=f"view_policy_{lead.get('leadId')}"):
+                        show_policy_copy_dialog(lead)
+                    if is_admin():
+                        if st.button("Delete Policy", use_container_width=True, key=f"del_policy_{lead.get('leadId')}"):
+                            with db_loader("Deleting policy copy..."):
+                                delete_policy_copy(lead_oid)
+                            st.success("Policy copy deleted.")
+                            st.rerun()
 
             with form_col:
                 st.markdown('<div class="lb-edit-form-title">Edit lead details</div>', unsafe_allow_html=True)
@@ -2707,24 +2719,6 @@ if page == "Leads":
                             add_note(lead_oid, comment_edit.strip(), created_by=current_username())
 
                     st.success("Saved. Click 'Refresh DB' in sidebar to reload cached DB connection.")
-
-                selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
-                if selected_status == "Closed" and policy_copy_present(selected_lead):
-                    if is_admin():
-                        _pc1, _pc2 = st.columns(2)
-                        with _pc1:
-                            if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
-                                show_policy_copy_dialog(selected_lead)
-                        with _pc2:
-                            st.markdown('<span class="lb-del-policy-marker"></span>', unsafe_allow_html=True)
-                            if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
-                                with db_loader("Deleting policy copy..."):
-                                    delete_policy_copy(lead_oid)
-                                st.success("Policy copy deleted.")
-                                st.rerun()
-                    else:
-                        if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
-                            show_policy_copy_dialog(selected_lead)
 
                 if can_manage_deletions():
                     st.markdown("---")
