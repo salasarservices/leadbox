@@ -199,8 +199,22 @@ footer { visibility: hidden; }
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: #2d448d;
   margin-bottom: 2px;
+}
+
+/* Pastel background on the SELECT LEAD label container */
+.stElementContainer:has(.lb-select-lead-label) {
+  background: #edf0fb !important;
+  padding: 10px 12px 4px 12px !important;
+}
+
+/* Pastel background on the selectbox immediately below + bottom separator */
+.stElementContainer:has(.lb-select-lead-label) + .stElementContainer {
+  background: #edf0fb !important;
+  padding: 0 12px 10px 12px !important;
+  border-bottom: 2px solid rgba(45, 68, 141, 0.16) !important;
+  margin-bottom: 10px !important;
 }
 
 /* ── Lead Summary Panel ──────────────────────────────────────────────────── */
@@ -285,6 +299,12 @@ footer { visibility: hidden; }
   margin-bottom: 14px;
   padding-bottom: 8px;
   border-bottom: 2px solid rgba(45, 68, 141, 0.18);
+}
+
+/* ── Delete Policy Copy button — red ─────────────────────────────────────── */
+.stColumn:has(.lb-del-policy-marker) button {
+  background-color: var(--kpi-lost) !important;
+  border-color: var(--kpi-lost) !important;
 }
 
 /* Read-only comments section */

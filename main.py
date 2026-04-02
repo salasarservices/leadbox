@@ -2710,14 +2710,21 @@ if page == "Leads":
 
                 selected_status = denormalize_lead_status(selected_lead.get("leadStatus"))
                 if selected_status == "Closed" and policy_copy_present(selected_lead):
-                    if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
-                        show_policy_copy_dialog(selected_lead)
                     if is_admin():
-                        if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
-                            with db_loader("Deleting policy copy..."):
-                                delete_policy_copy(lead_oid)
-                            st.success("Policy copy deleted.")
-                            st.rerun()
+                        _pc1, _pc2 = st.columns(2)
+                        with _pc1:
+                            if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
+                                show_policy_copy_dialog(selected_lead)
+                        with _pc2:
+                            st.markdown('<span class="lb-del-policy-marker"></span>', unsafe_allow_html=True)
+                            if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{selected_lead.get('leadId')}"):
+                                with db_loader("Deleting policy copy..."):
+                                    delete_policy_copy(lead_oid)
+                                st.success("Policy copy deleted.")
+                                st.rerun()
+                    else:
+                        if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_copy_{selected_lead.get('leadId')}"):
+                            show_policy_copy_dialog(selected_lead)
 
                 if can_manage_deletions():
                     st.markdown("---")
