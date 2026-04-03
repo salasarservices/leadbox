@@ -1930,19 +1930,15 @@ def delete_policy_copy(_id: ObjectId) -> None:
     _invalidate_leads_cache()
 
 
-def find_duplicate_lead(phone: str | None, email: str | None, contact_name: str | None, company_name: str | None) -> list[dict]:
-    """Return existing (non-archived) leads that match on phone, email, or contact+company."""
+def find_duplicate_lead(phone: str | None, email: str | None) -> list[dict]:
+    """Return existing (non-archived) leads that match on phone or email.
+    Name alone is not a duplicate signal — many people share the same name."""
     col = leads_col()
     or_clauses = []
     if phone and phone.strip():
         or_clauses.append({"contactPhone": {"$regex": f"^{phone.strip()}$", "$options": "i"}})
     if email and email.strip():
         or_clauses.append({"contactEmail": {"$regex": f"^{email.strip()}$", "$options": "i"}})
-    if contact_name and contact_name.strip() and company_name and company_name.strip():
-        or_clauses.append({
-            "contactName": {"$regex": f"^{contact_name.strip()}$", "$options": "i"},
-            "companyName": {"$regex": f"^{company_name.strip()}$", "$options": "i"},
-        })
     if not or_clauses:
         return []
     return list(col.find(
@@ -2990,14 +2986,22 @@ elif page == "Create Lead":
         allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
         policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatus == "Closed" else None
 
-        # ── Duplicate detection ───────────────────────────────────────────────
-        _dup_phone   = contactPhone.strip() or None
-        _dup_email   = contactEmail.strip() or None
-        _dup_contact = contactName.strip() or None
-        _dup_company = companyName.strip() or None
-        duplicates = find_duplicate_lead(_dup_phone, _dup_email, _dup_contact, _dup_company)
+        # ── Required fields validation ────────────────────────────────────────
+        _req_errors = []
+        if not contactName.strip():
+            _req_errors.append("**Contact Name** is required.")
+        if not allocated_to_name:
+            _req_errors.append("**Allocated To** is required.")
+        if not comment.strip():
+            _req_errors.append("**Comment** is required.")
+        if _req_errors:
+            st.error("Please fix the following before creating a lead:\n\n" + "\n".join(f"- {e}" for e in _req_errors))
+            st.stop()
+
+        # ── Duplicate detection (phone / email only) ──────────────────────────
+        duplicates = find_duplicate_lead(contactPhone.strip() or None, contactEmail.strip() or None)
         if duplicates:
-            lines = ["**Duplicate lead detected.** A lead with the same details already exists:\n"]
+            lines = ["**Duplicate lead detected.** A lead with the same phone or email already exists:\n"]
             for dup in duplicates:
                 _d_status = denormalize_lead_status(dup.get("leadStatus") or "") or "—"
                 lines.append(
