@@ -2423,6 +2423,7 @@ if page == "Leads":
 
     with left:
         # ── SELECT LEAD bar ───────────────────────────────────────────────────
+        st.markdown('<div style="height:14px;min-height:14px;"></div>', unsafe_allow_html=True)
         st.markdown('<div class="lb-select-lead-label">SELECT LEAD</div>', unsafe_allow_html=True)
 
         def lead_label(d: dict) -> str:

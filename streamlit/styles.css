@@ -193,10 +193,7 @@ footer { visibility: hidden; }
   letter-spacing: 0.02em;
 }
 
-/* ── SELECT LEAD label container: push down from table above ─────────────── */
-.stElementContainer:has(.lb-select-lead-label) {
-  margin-top: 6px !important;
-}
+/* (spacer is now in Python — no CSS margin needed here) */
 
 /* ── Leads table card: white bg, dark text, teal left-border accent ──────── */
 .lb-leads-neutral {
@@ -334,8 +331,10 @@ footer { visibility: hidden; }
   padding: 4px 14px 8px 14px;
 }
 
-/* Remove default Streamlit gap between the policy button containers */
-.stVerticalBlock:has(.lb-lead-summary-panel) {
+/* Remove gap between policy button containers — scoped to the summary
+   column's stVerticalBlock only (has lb-lead-summary-panel as DIRECT
+   grandchild, unlike the outer left column which has it much deeper) */
+[data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-lead-summary-panel) {
   gap: 0 !important;
 }
 
