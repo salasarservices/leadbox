@@ -340,6 +340,13 @@ footer { visibility: hidden; }
   margin: 0 !important;
 }
 
+/* Required field legend */
+.lb-required-note {
+  font-size: 0.75rem;
+  color: #ef4444;
+  margin: 4px 0 0 0;
+}
+
 /* Read-only comments section */
 .lb-comments-view{
   background: var(--pastel-lime);

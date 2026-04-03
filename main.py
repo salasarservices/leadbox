@@ -2511,7 +2511,8 @@ if page == "Leads":
                 _phone_disp    = lead.get("contactPhone") or "—"
                 _email_disp    = lead.get("contactEmail") or "—"
                 _alloc_disp    = (safe_get(lead, "allocatedTo.displayName") or "").strip() or "—"
-                _broker_disp   = str(lead.get("brokerageReceived")) if lead.get("brokerageReceived") is not None else "—"
+                _broker_raw    = lead.get("brokerageReceived")
+                _broker_disp   = f"₹{_broker_raw:,}" if isinstance(_broker_raw, (int, float)) else (f"₹{_broker_raw}" if _broker_raw is not None else "—")
                 _status_colors = {"fresh": "#3b82f6", "allocated": "#f59e0b", "interested": "#10b981", "lost": "#ef4444", "closed": "#8bc34a"}
                 _badge_bg      = _status_colors.get(_status_raw, "#3b82f6")
 
@@ -2930,15 +2931,15 @@ elif page == "Create Lead":
         with c1:
             leadDate = st.date_input("Lead date (IST)", value=datetime.now(IST).date())
             companyName = st.text_input("Company")
-            contactName = st.text_input("Contact person")
+            contactName = st.text_input("Contact person *")
             contactEmail = st.text_input("Email id")
             contactPhone = st.text_input("Phone number")
 
         with c2:
             productType = st.selectbox("Product type", ["(none)"] + product_opts)
             leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
-            allocPick = st.selectbox("Allocated to (choose)", ["None", "(TYPE NEW)"] + alloc_opts)
-            allocTyped = st.text_input("Or type allocated to (adds new)", value="", placeholder="Type a new name here...")
+            allocPick = st.selectbox("Allocated to — choose * ", ["None", "(TYPE NEW)"] + alloc_opts)
+            allocTyped = st.text_input("Or type allocated to (adds new) *", value="", placeholder="Type a new name here...")
             brokerage = st.text_input("Brokerage received", value="")
             net_premium = ""
             if leadStatus == "Closed":
@@ -2956,12 +2957,13 @@ elif page == "Create Lead":
                 st.caption("Policy Copy upload is available only when the lead status is Closed.")
 
         comment = st.text_area(
-            "Comments (optional)",
+            "Comments *",
             value="",
             height=90,
             placeholder="Add an initial comment for this lead...",
         )
 
+        st.markdown('<p class="lb-required-note">* Required fields</p>', unsafe_allow_html=True)
         submit_new_lead = st.form_submit_button("Create lead", use_container_width=True)
 
     if submit_new_lead:
