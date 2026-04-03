@@ -1347,7 +1347,7 @@ def plot_month_series(df: pd.DataFrame) -> go.Figure:
 # CRUD
 # -----------------------
 def build_query(filters: dict) -> Dict[str, Any]:
-    q: Dict[str, Any] = {}
+    q: Dict[str, Any] = {"isArchived": {"$ne": True}}
     if filters.get("status") and filters["status"] != "all":
         q["leadStatus"] = normalize_lead_status(filters["status"])
     if filters.get("allocatedTo") and filters["allocatedTo"] != "all":
@@ -1928,6 +1928,27 @@ def delete_policy_copy(_id: ObjectId) -> None:
     col = leads_col()
     col.update_one({"_id": _id}, {"$unset": {"policyCopy": ""}, "$set": {"updatedAt": now_utc()}})
     _invalidate_leads_cache()
+
+
+def find_duplicate_lead(phone: str | None, email: str | None, contact_name: str | None, company_name: str | None) -> list[dict]:
+    """Return existing (non-archived) leads that match on phone, email, or contact+company."""
+    col = leads_col()
+    or_clauses = []
+    if phone and phone.strip():
+        or_clauses.append({"contactPhone": {"$regex": f"^{phone.strip()}$", "$options": "i"}})
+    if email and email.strip():
+        or_clauses.append({"contactEmail": {"$regex": f"^{email.strip()}$", "$options": "i"}})
+    if contact_name and contact_name.strip() and company_name and company_name.strip():
+        or_clauses.append({
+            "contactName": {"$regex": f"^{contact_name.strip()}$", "$options": "i"},
+            "companyName": {"$regex": f"^{company_name.strip()}$", "$options": "i"},
+        })
+    if not or_clauses:
+        return []
+    return list(col.find(
+        {"$and": [{"isArchived": {"$ne": True}}, {"$or": or_clauses}]},
+        {"leadId": 1, "contactName": 1, "contactPhone": 1, "contactEmail": 1, "companyName": 1, "leadStatus": 1},
+    ))
 
 
 def create_lead(payload: dict) -> ObjectId:
@@ -2732,7 +2753,6 @@ if page == "Leads":
                         st.rerun()
 
     with right:
-        st.markdown('<div style="height:20px;min-height:20px;"></div>', unsafe_allow_html=True)
         try:
             df_chart = month_series_counts_df()
             if not df_chart.empty:
@@ -2969,6 +2989,28 @@ elif page == "Create Lead":
 
         allocated_to_name = (allocTyped.strip() or (allocPick if allocPick not in {"None", "(TYPE NEW)"} else "")).strip() or None
         policy_copy_doc = encode_uploaded_file(uploaded_policy_copy) if leadStatus == "Closed" else None
+
+        # ── Duplicate detection ───────────────────────────────────────────────
+        _dup_phone   = contactPhone.strip() or None
+        _dup_email   = contactEmail.strip() or None
+        _dup_contact = contactName.strip() or None
+        _dup_company = companyName.strip() or None
+        duplicates = find_duplicate_lead(_dup_phone, _dup_email, _dup_contact, _dup_company)
+        if duplicates:
+            lines = ["**Duplicate lead detected.** A lead with the same details already exists:\n"]
+            for dup in duplicates:
+                _d_status = denormalize_lead_status(dup.get("leadStatus") or "") or "—"
+                lines.append(
+                    f"- **{dup.get('leadId') or '?'}** — "
+                    f"{dup.get('contactName') or '—'} | "
+                    f"{dup.get('companyName') or '—'} | "
+                    f"Phone: {dup.get('contactPhone') or '—'} | "
+                    f"Email: {dup.get('contactEmail') or '—'} | "
+                    f"Status: {_d_status}"
+                )
+            lines.append("\nPlease check the existing lead before creating a new one.")
+            st.error("\n".join(lines))
+            st.stop()
 
         create_payload = {
             "leadDate": leadDate,
