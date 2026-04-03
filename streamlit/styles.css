@@ -193,9 +193,12 @@ footer { visibility: hidden; }
   letter-spacing: 0.02em;
 }
 
+/* ── Top gap above the details + chart columns ───────────────────────────── */
+.lb-details-gap { height: 16px; }
+
 /* ── SELECT LEAD bar ─────────────────────────────────────────────────────── */
 .lb-select-lead-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -203,18 +206,23 @@ footer { visibility: hidden; }
   margin-bottom: 2px;
 }
 
-/* Pastel background on the SELECT LEAD label container */
+/* SELECT LEAD label container — top + sides of the bordered card */
 .stElementContainer:has(.lb-select-lead-label) {
   background: #edf0fb !important;
-  padding: 10px 12px 4px 12px !important;
+  padding: 10px 14px 4px 14px !important;
+  border: 1px solid rgba(45, 68, 141, 0.18) !important;
+  border-bottom: none !important;
+  box-shadow: 0 2px 8px rgba(45, 68, 141, 0.07) !important;
 }
 
-/* Pastel background on the selectbox immediately below + bottom separator */
+/* Selectbox container — bottom + sides of the bordered card */
 .stElementContainer:has(.lb-select-lead-label) + .stElementContainer {
   background: #edf0fb !important;
-  padding: 0 12px 10px 12px !important;
-  border-bottom: 2px solid rgba(45, 68, 141, 0.16) !important;
-  margin-bottom: 0 !important;
+  padding: 0 14px 10px 14px !important;
+  border: 1px solid rgba(45, 68, 141, 0.18) !important;
+  border-top: none !important;
+  box-shadow: 0 2px 8px rgba(45, 68, 141, 0.07) !important;
+  margin-bottom: 12px !important;
 }
 
 /* ── Lead Summary Panel ──────────────────────────────────────────────────── */
@@ -312,6 +320,13 @@ footer { visibility: hidden; }
 /* Remove default Streamlit gap between the policy button containers */
 .stVerticalBlock:has(.lb-lead-summary-panel) {
   gap: 0 !important;
+}
+
+/* Smaller text on policy buttons so "View Policy Copy" fits comfortably */
+.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer button {
+  font-size: 0.70rem !important;
+  letter-spacing: 0.05em !important;
+  padding: 0.45rem 0.5rem !important;
 }
 
 /* Read-only comments section */

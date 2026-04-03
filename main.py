@@ -2418,6 +2418,7 @@ if page == "Leads":
             st.error(f"PDF generation failed: {_pdf_err}")
         card_close()
 
+    st.markdown('<div class="lb-details-gap"></div>', unsafe_allow_html=True)
     left, right = st.columns([0.62, 0.38])
 
     with left:
@@ -2533,10 +2534,10 @@ if page == "Leads":
                 # Policy copy buttons inside the summary column
                 _sel_status = denormalize_lead_status(lead.get("leadStatus"))
                 if _sel_status == "Closed" and policy_copy_present(lead):
-                    if st.button("View Policy", use_container_width=True, key=f"view_policy_{lead.get('leadId')}"):
+                    if st.button("View Policy Copy", use_container_width=True, key=f"view_policy_{lead.get('leadId')}"):
                         show_policy_copy_dialog(lead)
                     if is_admin():
-                        if st.button("Delete Policy", use_container_width=True, key=f"del_policy_{lead.get('leadId')}"):
+                        if st.button("Delete Policy Copy", use_container_width=True, key=f"del_policy_{lead.get('leadId')}"):
                             with db_loader("Deleting policy copy..."):
                                 delete_policy_copy(lead_oid)
                             st.success("Policy copy deleted.")
