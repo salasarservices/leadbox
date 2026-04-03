@@ -310,18 +310,22 @@ footer { visibility: hidden; }
 }
 
 /* ── Summary column: extend dark navy bg to cover the policy buttons ─────── */
-/* Target only stElementContainers that are siblings of the panel container,
-   scoped within the same stVerticalBlock (the summary_col content area) */
 .stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
   background: #1a2e52;
   padding: 0 14px 6px 14px;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
 }
 
-/* Remove gap between policy button containers — scoped to the summary
-   column's stVerticalBlock only (has lb-lead-summary-panel as DIRECT
-   grandchild, unlike the outer left column which has it much deeper) */
+/* Remove gap between policy button containers */
 [data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-lead-summary-panel) {
   gap: 0 !important;
+}
+
+/* Also zero out the stButton wrapper's default margin inside policy siblings */
+.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer [data-testid="stButton"],
+.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer [data-testid="stBaseButton-secondary"] {
+  margin: 0 !important;
 }
 
 /* Smaller text on policy buttons so "View Policy Copy" fits comfortably */
@@ -329,6 +333,7 @@ footer { visibility: hidden; }
   font-size: 0.70rem !important;
   letter-spacing: 0.05em !important;
   padding: 0.45rem 0.5rem !important;
+  margin: 0 !important;
 }
 
 /* Read-only comments section */
