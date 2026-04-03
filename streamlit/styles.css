@@ -314,7 +314,7 @@ footer { visibility: hidden; }
    scoped within the same stVerticalBlock (the summary_col content area) */
 .stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
   background: #1a2e52;
-  padding: 4px 14px 8px 14px;
+  padding: 0 14px 6px 14px;
 }
 
 /* Remove gap between policy button containers — scoped to the summary
