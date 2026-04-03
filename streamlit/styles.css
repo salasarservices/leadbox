@@ -312,36 +312,33 @@ footer { visibility: hidden; }
 /* ── Summary column: extend dark navy bg to cover the policy button group ─── */
 .stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
   background: #1a2e52;
-  padding: 0 14px 8px 14px;
+  padding: 0;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
 
-/* Hide the lb-policy-btn-group marker div (it's only a hook for CSS) */
-.stElementContainer:has(.lb-policy-btn-group) {
+/* Hide the lb-policy-btn-group marker div (CSS hook only, takes no space) */
+.stElementContainer:has(> [data-testid="stMarkdownContainer"] > .lb-policy-btn-group) {
   display: none !important;
 }
 
-/* Inner stVerticalBlock created by st.container() — kill all gaps between buttons */
-[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) {
+/* Target ONLY the direct inner stVerticalBlock of st.container() via direct-child chain */
+[data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-policy-btn-group) {
   gap: 0 !important;
-  background: #1a2e52;
-  padding: 0 14px 8px 14px;
 }
 
-/* Each button element container inside the group — no margin, no padding gap */
-[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) > .stElementContainer {
+/* Each button container inside the inner VB — strip all margin/padding */
+[data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-policy-btn-group) > .stElementContainer {
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 0 14px !important;
 }
 
-/* Smaller text on policy buttons so labels fit comfortably */
-[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) button {
+/* Smaller text on policy buttons */
+[data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-policy-btn-group) button {
   font-size: 0.70rem !important;
   letter-spacing: 0.05em !important;
   padding: 0.45rem 0.5rem !important;
   margin: 0 !important;
-  border-radius: 0 !important;
 }
 
 /* Read-only comments section */
