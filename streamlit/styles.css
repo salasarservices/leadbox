@@ -197,8 +197,7 @@ footer { visibility: hidden; }
 
 /* ── Leads table card: white bg, dark text, teal left-border accent ──────── */
 .lb-leads-neutral {
-  background: #ffffff;
-  border-left: 4px solid #11c1b2;
+  background: #b1edb3;
 }
 .lb-leads-neutral .lb-title {
   color: var(--navy) !important;
