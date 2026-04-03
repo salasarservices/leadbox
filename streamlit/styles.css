@@ -309,31 +309,39 @@ footer { visibility: hidden; }
   border-bottom: 2px solid rgba(45, 68, 141, 0.18);
 }
 
-/* ── Summary column: extend dark navy bg to cover the policy buttons ─────── */
+/* ── Summary column: extend dark navy bg to cover the policy button group ─── */
 .stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
   background: #1a2e52;
-  padding: 0 14px 6px 14px;
+  padding: 0 14px 8px 14px;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
 
-/* Remove gap between policy button containers */
-[data-testid="stVerticalBlock"]:has(> .stElementContainer > [data-testid="stMarkdownContainer"] > .lb-lead-summary-panel) {
+/* Hide the lb-policy-btn-group marker div (it's only a hook for CSS) */
+.stElementContainer:has(.lb-policy-btn-group) {
+  display: none !important;
+}
+
+/* Inner stVerticalBlock created by st.container() — kill all gaps between buttons */
+[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) {
   gap: 0 !important;
+  background: #1a2e52;
+  padding: 0 14px 8px 14px;
 }
 
-/* Also zero out the stButton wrapper's default margin inside policy siblings */
-.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer [data-testid="stButton"],
-.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer [data-testid="stBaseButton-secondary"] {
+/* Each button element container inside the group — no margin, no padding gap */
+[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) > .stElementContainer {
   margin: 0 !important;
+  padding: 0 !important;
 }
 
-/* Smaller text on policy buttons so "View Policy Copy" fits comfortably */
-.stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer button {
+/* Smaller text on policy buttons so labels fit comfortably */
+[data-testid="stVerticalBlock"]:has(.lb-policy-btn-group) button {
   font-size: 0.70rem !important;
   letter-spacing: 0.05em !important;
   padding: 0.45rem 0.5rem !important;
   margin: 0 !important;
+  border-radius: 0 !important;
 }
 
 /* Read-only comments section */
