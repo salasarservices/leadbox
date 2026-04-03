@@ -2938,8 +2938,9 @@ elif page == "Create Lead":
         with c2:
             productType = st.selectbox("Product type", ["(none)"] + product_opts)
             leadStatus = st.selectbox("Lead status", LEAD_STATUS_OPTIONS)
-            allocPick = st.selectbox("Allocated to — choose * ", ["None", "(TYPE NEW)"] + alloc_opts)
-            allocTyped = st.text_input("Or type allocated to (adds new) *", value="", placeholder="Type a new name here...")
+            st.markdown('<p class="lb-field-label-req">Allocated to * <span>(choose from list OR type a new name below)</span></p>', unsafe_allow_html=True)
+            allocPick = st.selectbox("Allocated to", ["None", "(TYPE NEW)"] + alloc_opts, label_visibility="collapsed")
+            allocTyped = st.text_input("Or type a new name", value="", placeholder="Type a new name here...", label_visibility="collapsed")
             brokerage = st.text_input("Brokerage received", value="")
             net_premium = ""
             if leadStatus == "Closed":
@@ -2995,7 +2996,7 @@ elif page == "Create Lead":
         if not contactName.strip():
             _req_errors.append("**Contact Name** is required.")
         if not allocated_to_name:
-            _req_errors.append("**Allocated To** is required.")
+            _req_errors.append("**Allocated To** is required — choose from the list or type a new name.")
         if not comment.strip():
             _req_errors.append("**Comment** is required.")
         if _req_errors:

@@ -347,6 +347,19 @@ footer { visibility: hidden; }
   margin: 4px 0 0 0;
 }
 
+/* Allocated-to compound field label */
+.lb-field-label-req {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+  margin: 0 0 4px 0;
+}
+.lb-field-label-req span {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 /* Read-only comments section */
 .lb-comments-view{
   background: var(--pastel-lime);
