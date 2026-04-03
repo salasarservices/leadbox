@@ -210,33 +210,19 @@ footer { visibility: hidden; }
   display: none;
 }
 
-/* ── SELECT LEAD bar ─────────────────────────────────────────────────────── */
-.lb-select-lead-label {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #2d448d;
-  margin-bottom: 2px;
-}
+/* ── SELECT LEAD section ─────────────────────────────────────────────────── */
 
-/* SELECT LEAD label container — top + sides of the bordered card */
+/* Hide the empty label marker container — keep it as a CSS hook only */
 .stElementContainer:has(.lb-select-lead-label) {
-  background: #edf0fb !important;
-  padding: 10px 14px 4px 14px !important;
-  border: 1px solid rgba(45, 68, 141, 0.18) !important;
-  border-bottom: none !important;
-  box-shadow: 0 2px 8px rgba(45, 68, 141, 0.07) !important;
+  display: none !important;
 }
 
-/* Selectbox container — bottom + sides of the bordered card */
+/* Selectbox container: #03A9F4 background, padded to match card header height */
 .stElementContainer:has(.lb-select-lead-label) + .stElementContainer {
-  background: #edf0fb !important;
-  padding: 0 14px 10px 14px !important;
-  border: 1px solid rgba(45, 68, 141, 0.18) !important;
-  border-top: none !important;
-  box-shadow: 0 2px 8px rgba(45, 68, 141, 0.07) !important;
+  background: #03A9F4 !important;
+  padding: 14px 14px !important;
   margin-bottom: 12px !important;
+  box-shadow: 0 4px 12px rgba(3, 169, 244, 0.20) !important;
 }
 
 /* ── Lead Summary Panel ──────────────────────────────────────────────────── */

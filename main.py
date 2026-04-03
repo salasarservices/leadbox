@@ -2423,8 +2423,7 @@ if page == "Leads":
 
     with left:
         # ── SELECT LEAD bar ───────────────────────────────────────────────────
-        st.markdown('<div style="height:14px;min-height:14px;"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="lb-select-lead-label">SELECT LEAD</div>', unsafe_allow_html=True)
+        st.markdown('<div class="lb-select-lead-label"></div>', unsafe_allow_html=True)
 
         def lead_label(d: dict) -> str:
             lid = d.get("leadId") or "?"
@@ -2733,6 +2732,7 @@ if page == "Leads":
                         st.rerun()
 
     with right:
+        st.markdown('<div style="height:20px;min-height:20px;"></div>', unsafe_allow_html=True)
         try:
             df_chart = month_series_counts_df()
             if not df_chart.empty:
