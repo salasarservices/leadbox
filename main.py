@@ -2389,7 +2389,7 @@ if page == "Leads":
     download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
     download_key = "filtered_leads" if is_filtered else "leads"
 
-    card_open(table_title, "lb-lime", "#a6ce39", subtitle=table_subtitle)
+    card_open(table_title, "lb-leads-neutral", "#11c1b2", subtitle=table_subtitle)
     render_leads_table(
         leads,
         table_key="filtered_leads_table",
@@ -2418,7 +2418,7 @@ if page == "Leads":
             st.error(f"PDF generation failed: {_pdf_err}")
         card_close()
 
-    st.markdown('<div class="lb-details-gap"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:20px;min-height:20px;display:block;"></div>', unsafe_allow_html=True)
     left, right = st.columns([0.62, 0.38])
 
     with left:

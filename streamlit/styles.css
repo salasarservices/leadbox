@@ -193,8 +193,25 @@ footer { visibility: hidden; }
   letter-spacing: 0.02em;
 }
 
-/* ── Top gap above the details + chart columns ───────────────────────────── */
-.lb-details-gap { height: 16px; }
+/* ── SELECT LEAD label container: push down from table above ─────────────── */
+.stElementContainer:has(.lb-select-lead-label) {
+  margin-top: 6px !important;
+}
+
+/* ── Leads table card: white bg, dark text, teal left-border accent ──────── */
+.lb-leads-neutral {
+  background: #ffffff;
+  border-left: 4px solid #11c1b2;
+}
+.lb-leads-neutral .lb-title {
+  color: var(--navy) !important;
+}
+.lb-leads-neutral .lb-subtitle {
+  color: var(--muted) !important;
+}
+.lb-leads-neutral .lb-dot {
+  display: none;
+}
 
 /* ── SELECT LEAD bar ─────────────────────────────────────────────────────── */
 .lb-select-lead-label {
