@@ -24,35 +24,29 @@
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
-.stApp,
-.stApp button,
-.stApp input,
-.stApp textarea,
-.stApp select,
-.stApp label,
-.stApp [data-baseweb],
-.stMarkdown,
-.stDataFrame,
-.stAlert {
-  font-family: var(--app-font);
+/* ── Global font: Consolas everywhere ── */
+html, body {
+  font-family: 'Consolas', 'Courier New', monospace !important;
+}
+* {
+  font-family: inherit !important;
 }
 
-/* Default cursor on all non-editable content */
-.stApp * { cursor: default !important; }
+/* ── Cursor: default on all text, text-cursor only on editable fields ── */
+html body * { cursor: default !important; }
 
-/* Restore text cursor only on editable fields */
-.stApp input,
-.stApp textarea,
-.stApp [contenteditable="true"] { cursor: text !important; }
+html body input,
+html body textarea,
+html body [contenteditable="true"] { cursor: text !important; }
 
-/* Restore pointer on clickable elements */
-.stApp button,
-.stApp a,
-.stApp select,
-.stApp [role="button"],
-.stApp [role="option"],
-.stApp [role="tab"],
-.stApp label { cursor: pointer !important; }
+html body button,
+html body a,
+html body select,
+html body [role="button"],
+html body [role="option"],
+html body [role="tab"],
+html body [role="slider"],
+html body label { cursor: pointer !important; }
 
 .stApp { background: var(--bg); color: var(--text); }
 .block-container { padding-top: 1.0rem; padding-bottom: 1.5rem; max-width: 1200px; }
