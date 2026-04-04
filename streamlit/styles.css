@@ -26,9 +26,15 @@
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
-/* ── Remove Streamlit wrapper border-radius that bleeds through custom HTML ── */
-[data-testid="stMarkdownContainer"],
-[data-testid="stVerticalBlock"] {
+/* ── Strip Streamlit wrapper backgrounds and border-radius ── */
+/* All visual styling lives in our inline-styled divs — containers must be transparent */
+[data-testid="stMarkdownContainer"] {
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+[data-testid="stElementContainer"],
+[data-testid="stVerticalBlock"],
+[data-testid="stColumn"] {
   border-radius: 0 !important;
 }
 
