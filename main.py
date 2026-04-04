@@ -918,13 +918,13 @@ def render_comments_section(selected_lead: dict) -> None:
                         st.rerun()
 
             else:
-                col_e, col_d, _ = st.columns([2, 2, 8])
+                col_e, col_d, _ = st.columns([3, 3, 6])
                 with col_e:
-                    if st.button("Edit", key=f"comments_admin_edit_btn_{lead_id}_{idx}"):
+                    if st.button("Edit", key=f"comments_admin_edit_btn_{lead_id}_{idx}", use_container_width=True):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with col_d:
-                    if st.button("Delete", key=f"comments_admin_del_btn_{lead_id}_{idx}"):
+                    if st.button("Delete", key=f"comments_admin_del_btn_{lead_id}_{idx}", use_container_width=True):
                         st.session_state[del_key] = True
                         st.rerun()
 
@@ -961,9 +961,9 @@ def render_comments_section(selected_lead: dict) -> None:
                             st.session_state[edit_key] = False
                             st.rerun()
                 else:
-                    col_e, _ = st.columns([2, 8])
+                    col_e, _ = st.columns([3, 7])
                     with col_e:
-                        if st.button("Edit comment", key=f"comments_edit_btn_{lead_id}"):
+                        if st.button("Edit comment", key=f"comments_edit_btn_{lead_id}", use_container_width=True):
                             st.session_state[edit_key] = True
                             st.rerun()
 
