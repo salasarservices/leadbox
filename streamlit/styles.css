@@ -26,6 +26,12 @@
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
+/* ── Remove Streamlit wrapper border-radius that bleeds through custom HTML ── */
+[data-testid="stMarkdownContainer"],
+[data-testid="stVerticalBlock"] {
+  border-radius: 0 !important;
+}
+
 /* ── Hide native file input text exposed by font override ── */
 /* Must keep element in place (Streamlit overlays it on the Upload button) */
 input[type="file"] {
