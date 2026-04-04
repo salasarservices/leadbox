@@ -1344,6 +1344,180 @@ def plot_month_series(df: pd.DataFrame) -> go.Figure:
 
 
 # -----------------------
+# Chart section — KPI strip + Plotly area/bar chart
+# -----------------------
+
+def compute_chart_kpis(df: pd.DataFrame) -> dict:
+    total = int(df["count"].sum())
+    last_row = df.iloc[-1]
+    this_month = int(last_row["count"])
+    this_month_label = str(last_row["label"])
+    peak_idx = df["count"].idxmax()
+    peak_count = int(df.loc[peak_idx, "count"])
+    peak_label = str(df.loc[peak_idx, "label"])
+    avg_per_month = round(float(df["count"].mean()), 1)
+    return {
+        "total": total,
+        "this_month": this_month,
+        "this_month_label": this_month_label,
+        "peak_count": peak_count,
+        "peak_label": peak_label,
+        "avg_per_month": avg_per_month,
+    }
+
+
+def render_kpi_strip(kpis: dict) -> str:
+    cards = [
+        {
+            "accent": "#1B3A6B",
+            "label": "Total Leads",
+            "value": str(kpis["total"]),
+            "sub": "all time",
+        },
+        {
+            "accent": "#0E8A7A",
+            "label": "This Month",
+            "value": str(kpis["this_month"]),
+            "sub": kpis["this_month_label"],
+        },
+        {
+            "accent": "#534AB7",
+            "label": "Peak Month",
+            "value": str(kpis["peak_count"]),
+            "sub": kpis["peak_label"],
+        },
+        {
+            "accent": "#C8922A",
+            "label": "Avg / Month",
+            "value": str(kpis["avg_per_month"]),
+            "sub": "monthly average",
+        },
+    ]
+    cols_html = ""
+    for c in cards:
+        cols_html += f"""
+        <div style="flex:1;background:white;border:1px solid #E2EAF2;border-radius:10px;
+                    border-left:4px solid {c['accent']};padding:10px 14px;">
+          <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;
+                      text-transform:uppercase;color:{c['accent']};margin-bottom:4px;">
+            {c['label']}
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#1E293B;line-height:1.1;">
+            {c['value']}
+          </div>
+          <div style="font-size:10px;color:#94A3B8;margin-top:3px;">{c['sub']}</div>
+        </div>"""
+    return f'<div style="display:flex;gap:10px;margin-bottom:12px;">{cols_html}</div>'
+
+
+def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
+    avg = float(df["count"].mean())
+    labels = df["label"].tolist()
+    counts = df["count"].tolist()
+
+    fig = go.Figure()
+
+    if chart_type == "Line":
+        fig.add_trace(go.Scatter(
+            x=labels,
+            y=counts,
+            mode="lines+markers",
+            line=dict(color="#1B3A6B", width=2.5),
+            fill="tozeroy",
+            fillcolor="rgba(27,58,107,0.07)",
+            marker=dict(size=6, color="#1B3A6B"),
+            hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
+        ))
+        fig.add_hline(
+            y=avg,
+            line=dict(color="#C8922A", dash="dash", width=1.5),
+            annotation_text="Avg",
+            annotation_position="right",
+            annotation_font=dict(size=10, color="#C8922A"),
+        )
+    else:
+        fig.add_trace(go.Bar(
+            x=labels,
+            y=counts,
+            marker=dict(color="#1B3A6B", opacity=0.85, line=dict(width=0)),
+            hovertemplate="<b>%{x}</b><br>Leads: %{y}<extra></extra>",
+        ))
+        rolling = pd.Series(counts).rolling(window=3, min_periods=1).mean().tolist()
+        fig.add_trace(go.Scatter(
+            x=labels,
+            y=rolling,
+            mode="lines",
+            line=dict(color="#C8922A", width=2),
+            hoverinfo="skip",
+        ))
+        fig.add_hline(
+            y=avg,
+            line=dict(color="#C8922A", dash="dash", width=1.5),
+            annotation_text="Avg",
+            annotation_position="right",
+            annotation_font=dict(size=10, color="#C8922A"),
+        )
+
+    fig.update_layout(
+        height=220,
+        margin=dict(l=10, r=10, t=10, b=40),
+        paper_bgcolor="#FFFFFF",
+        plot_bgcolor="#FFFFFF",
+        showlegend=False,
+        legend=dict(visible=False),
+        xaxis=dict(
+            showgrid=False,
+            tickangle=-45,
+            tickfont=dict(size=10, color="#888888"),
+        ),
+        yaxis=dict(
+            gridcolor="rgba(0,0,0,0.05)",
+            tickfont=dict(size=10, color="#888888"),
+        ),
+    )
+    return fig
+
+
+def render_chart_section(df: pd.DataFrame) -> None:
+    # Section header
+    st.markdown("""
+    <div style="background:#1B3A6B;border-radius:10px 10px 0 0;padding:10px 16px;">
+      <div style="color:white;font-size:13px;font-weight:700;line-height:1.2;">Month-wise leads</div>
+      <div style="color:#A8C4E8;font-size:10px;margin-top:2px;">Lead activity over time</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Card body
+    with st.container():
+        st.markdown("""
+        <div style="background:white;border:0.5px solid #E2EAF2;border-radius:0 0 10px 10px;
+                    padding:14px 16px 10px 16px;">
+        """, unsafe_allow_html=True)
+
+        kpis = compute_chart_kpis(df)
+        st.markdown(render_kpi_strip(kpis), unsafe_allow_html=True)
+
+        # Toggle — right-aligned
+        _, toggle_col = st.columns([4, 1])
+        with toggle_col:
+            chart_type = st.radio(
+                label="",
+                options=["Line", "Bar"],
+                index=0,
+                horizontal=True,
+                key="leads_chart_type",
+            )
+
+        st.plotly_chart(
+            render_leads_chart(df, chart_type),
+            use_container_width=True,
+            config={"displayModeBar": False},
+        )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# -----------------------
 # CRUD
 # -----------------------
 def build_query(filters: dict) -> Dict[str, Any]:
@@ -2755,9 +2929,7 @@ if page == "Leads":
         try:
             df_chart = month_series_counts_df()
             if not df_chart.empty:
-                card_open("Month-Wise Leads", "lb-cyan", "#00aeef", subtitle="Lead activity over time")
-                st.plotly_chart(plot_month_series(df_chart), use_container_width=True)
-                card_close()
+                render_chart_section(df_chart)
         except Exception:
             pass
 
