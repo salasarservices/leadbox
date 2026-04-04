@@ -28,13 +28,11 @@
 
 /* ── Strip Streamlit wrapper backgrounds and border-radius ── */
 /* All visual styling lives in our inline-styled divs — containers must be transparent */
-[data-testid="stMarkdownContainer"] {
-  background: transparent !important;
-  border-radius: 0 !important;
-}
+[data-testid="stMarkdownContainer"],
 [data-testid="stElementContainer"],
 [data-testid="stVerticalBlock"],
 [data-testid="stColumn"] {
+  background: transparent !important;
   border-radius: 0 !important;
 }
 
@@ -346,7 +344,7 @@ footer { visibility: hidden; }
 
 /* ── Summary column: extend dark navy bg to cover the policy button group ─── */
 .stElementContainer:has(.lb-lead-summary-panel) ~ .stElementContainer {
-  background: #1a2e52;
+  background: #1a2e52 !important;
   padding: 0;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
