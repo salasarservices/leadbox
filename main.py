@@ -1497,19 +1497,8 @@ def render_chart_section(df: pd.DataFrame) -> None:
         kpis = compute_chart_kpis(df)
         st.markdown(render_kpi_strip(kpis), unsafe_allow_html=True)
 
-        # Toggle — right-aligned
-        _, toggle_col = st.columns([4, 1])
-        with toggle_col:
-            chart_type = st.radio(
-                label="",
-                options=["Line", "Bar"],
-                index=0,
-                horizontal=True,
-                key="leads_chart_type",
-            )
-
         st.plotly_chart(
-            render_leads_chart(df, chart_type),
+            render_leads_chart(df, "Line"),
             use_container_width=True,
             config={"displayModeBar": False},
         )
