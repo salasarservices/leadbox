@@ -37,6 +37,23 @@
   font-family: var(--app-font);
 }
 
+/* Default cursor on all non-editable content */
+.stApp * { cursor: default !important; }
+
+/* Restore text cursor only on editable fields */
+.stApp input,
+.stApp textarea,
+.stApp [contenteditable="true"] { cursor: text !important; }
+
+/* Restore pointer on clickable elements */
+.stApp button,
+.stApp a,
+.stApp select,
+.stApp [role="button"],
+.stApp [role="option"],
+.stApp [role="tab"],
+.stApp label { cursor: pointer !important; }
+
 .stApp { background: var(--bg); color: var(--text); }
 .block-container { padding-top: 1.0rem; padding-bottom: 1.5rem; max-width: 1200px; }
 
