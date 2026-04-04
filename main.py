@@ -741,6 +741,253 @@ def comments_view_html(notes: list[dict]) -> str:
     return "".join(rows)
 
 
+# -----------------------
+# Comments activity feed
+# -----------------------
+
+_DATE_ENTRY_RE = re.compile(r'^(\d{2}\.\d{2}\.\d{2}):\s*', re.MULTILINE)
+
+
+def get_initials(username: str) -> str:
+    parts = re.split(r'[._\s]+', username.strip())
+    parts = [p for p in parts if p]
+    if len(parts) >= 2:
+        return (parts[0][0] + parts[1][0]).upper()
+    return username[:2].upper() if len(username) >= 2 else username.upper()
+
+
+def get_avatar_colour(username: str) -> tuple[str, str]:
+    palette = [
+        ("#EEEDFE", "#3C3489"),
+        ("#E1F5EE", "#085041"),
+        ("#E6F1FB", "#0C447C"),
+        ("#FAECE7", "#712B13"),
+        ("#EAF3DE", "#27500A"),
+    ]
+    return palette[hash(username) % 5]
+
+
+def _bubble_content_html(text: str) -> str:
+    lines = [l for l in text.split('\n') if l.strip()]
+    has_dates = any(_DATE_ENTRY_RE.match(l.strip()) for l in lines)
+    if not has_dates:
+        safe = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+        return f'<span style="font-size:12px;color:#1E293B;">{safe}</span>'
+    entries: list[tuple[str, str]] = []
+    for line in lines:
+        line = line.strip()
+        m = _DATE_ENTRY_RE.match(line)
+        if m:
+            entries.append((m.group(1), line[m.end():].strip()))
+        elif entries:
+            entries[-1] = (entries[-1][0], entries[-1][1] + ' ' + line)
+        else:
+            entries.append(('', line))
+    html = ''
+    for date_str, entry_text in entries:
+        safe = entry_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        if date_str:
+            html += (
+                f'<div style="display:flex;gap:10px;align-items:baseline;margin-bottom:4px;">'
+                f'<span style="font-size:10px;font-weight:700;color:#94A3B8;min-width:56px;flex-shrink:0;">{date_str}</span>'
+                f'<span style="font-size:12px;color:#1E293B;">{safe}</span></div>'
+            )
+        else:
+            html += f'<div style="font-size:12px;color:#1E293B;margin-bottom:4px;">{safe}</div>'
+    return html
+
+
+def comment_entry_html(note: dict, is_last: bool) -> str:
+    username = str((note or {}).get('createdBy') or 'Unknown').strip() or 'Unknown'
+    ts = format_note_datetime_ist((note or {}).get('createdAt'))
+    text = str((note or {}).get('text') or '').strip() or '(empty comment)'
+    edit_hist = format_edit_history(note)
+    initials = get_initials(username)
+    bg, fg = get_avatar_colour(username)
+    connector = (
+        '' if is_last else
+        '<div style="width:1.5px;flex:1;background:#E2EAF2;margin-top:4px;min-height:16px;"></div>'
+    )
+    edit_hist_html = (
+        f'<div style="font-size:10px;color:#94A3B8;margin-bottom:4px;font-style:italic;">{edit_hist}</div>'
+        if edit_hist else ''
+    )
+    pb = '0' if is_last else '14px'
+    return (
+        f'<div style="display:flex;gap:12px;margin-bottom:4px;position:relative;">'
+        f'<div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">'
+        f'<div style="width:32px;height:32px;border-radius:50%;background:{bg};color:{fg};'
+        f'font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;">'
+        f'{initials}</div>{connector}</div>'
+        f'<div style="flex:1;min-width:0;padding-bottom:{pb};">'
+        f'<div style="display:flex;gap:8px;align-items:baseline;margin-bottom:4px;flex-wrap:wrap;">'
+        f'<span style="font-size:12px;font-weight:700;color:#1E293B;">{username}</span>'
+        f'<span style="font-size:10px;color:#94A3B8;">{ts}</span></div>'
+        f'{edit_hist_html}'
+        f'<div style="background:#F8FAFC;border:0.5px solid #E2EAF2;border-radius:0 8px 8px 8px;'
+        f'padding:10px 13px;line-height:1.7;">{_bubble_content_html(text)}</div>'
+        f'</div></div>'
+    )
+
+
+def render_comments_header(count: int) -> str:
+    return (
+        f'<div style="background:#0E8A7A;border-radius:10px 10px 0 0;padding:10px 16px;'
+        f'display:flex;align-items:center;justify-content:space-between;">'
+        f'<div>'
+        f'<div style="color:white;font-size:13px;font-weight:700;line-height:1.2;">Comments</div>'
+        f'<div style="color:rgba(255,255,255,0.75);font-size:10px;margin-top:2px;">Read-only timeline from database</div>'
+        f'</div>'
+        f'<div style="background:rgba(255,255,255,0.15);color:white;font-size:10px;font-weight:700;'
+        f'padding:3px 10px;border-radius:10px;">{count} notes</div>'
+        f'</div>'
+    )
+
+
+def render_comments_section(selected_lead: dict) -> None:
+    notes = dedupe_notes([n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)])
+    notes_sorted = sorted(
+        notes,
+        key=lambda n: (
+            n.get("createdAt") if isinstance(n.get("createdAt"), datetime)
+            else datetime.min.replace(tzinfo=timezone.utc)
+        ),
+        reverse=True,
+    )
+    lead_id = selected_lead.get("leadId") or str(selected_lead.get("_id", ""))
+    lead_oid = selected_lead["_id"]
+
+    st.markdown(render_comments_header(len(notes_sorted)), unsafe_allow_html=True)
+    st.markdown(
+        '<div style="background:white;border:0.5px solid #E2EAF2;'
+        'border-radius:0 0 12px 12px;padding:16px 16px 8px 16px;">',
+        unsafe_allow_html=True,
+    )
+
+    if not notes_sorted:
+        st.info("No comments available for this lead.")
+
+    elif can_delete_comments():
+        # ── Admin: all comments, edit + delete with confirmation ──
+        for idx, note in enumerate(notes_sorted):
+            is_last = idx == len(notes_sorted) - 1
+            text = str((note or {}).get("text") or "").strip() or "(empty comment)"
+            edit_key = f"comments_admin_editing_{lead_id}_{idx}"
+            del_key  = f"comments_admin_deleting_{lead_id}_{idx}"
+            is_editing  = st.session_state.get(edit_key, False)
+            is_deleting = st.session_state.get(del_key, False)
+
+            st.markdown(comment_entry_html(note, is_last), unsafe_allow_html=True)
+
+            if is_editing:
+                edited = st.text_area(
+                    "Edit", value=text, height=100,
+                    key=f"comments_admin_edit_text_{lead_id}_{idx}",
+                    label_visibility="collapsed",
+                )
+                col_s, col_c = st.columns(2)
+                with col_s:
+                    if st.button("Save", key=f"comments_admin_save_{lead_id}_{idx}", use_container_width=True):
+                        if edited.strip() and edited.strip() != text:
+                            with db_loader("Saving comment..."):
+                                edit_note(lead_oid, note, edited.strip())
+                            st.session_state[edit_key] = False
+                            st.success("Comment updated.")
+                            st.rerun()
+                        elif edited.strip() == text:
+                            st.session_state[edit_key] = False
+                            st.rerun()
+                with col_c:
+                    if st.button("Cancel", key=f"comments_admin_cancel_{lead_id}_{idx}", use_container_width=True):
+                        st.session_state[edit_key] = False
+                        st.rerun()
+
+            elif is_deleting:
+                st.warning("Are you sure you want to delete this comment?")
+                col_cf, col_cx = st.columns(2)
+                with col_cf:
+                    if st.button("Confirm delete", key=f"comments_admin_confirm_del_{lead_id}_{idx}", use_container_width=True):
+                        with db_loader("Deleting comment..."):
+                            delete_note(lead_oid, note)
+                        st.session_state[del_key] = False
+                        st.success("Comment deleted.")
+                        st.rerun()
+                with col_cx:
+                    if st.button("Cancel", key=f"comments_admin_cancel_del_{lead_id}_{idx}", use_container_width=True):
+                        st.session_state[del_key] = False
+                        st.rerun()
+
+            else:
+                col_e, col_d, _ = st.columns([1, 1, 6])
+                with col_e:
+                    if st.button("Edit", key=f"comments_admin_edit_btn_{lead_id}_{idx}", use_container_width=True):
+                        st.session_state[edit_key] = True
+                        st.rerun()
+                with col_d:
+                    if st.button("Delete", key=f"comments_admin_del_btn_{lead_id}_{idx}", use_container_width=True):
+                        st.session_state[del_key] = True
+                        st.rerun()
+
+    elif can_edit_leads():
+        # ── Manager: most recent editable, rest read-only; add new at bottom ──
+        for idx, note in enumerate(notes_sorted):
+            is_last = idx == len(notes_sorted) - 1
+            text = str((note or {}).get("text") or "").strip() or "(empty comment)"
+            st.markdown(comment_entry_html(note, is_last), unsafe_allow_html=True)
+
+            if idx == 0:
+                edit_key = f"comments_editing_{lead_id}"
+                is_editing = st.session_state.get(edit_key, False)
+                if is_editing:
+                    edited_text = st.text_area(
+                        "Edit comment", value=text, height=100,
+                        key=f"comments_inline_edit_text_{lead_id}",
+                        label_visibility="collapsed",
+                    )
+                    col_s, col_c = st.columns(2)
+                    with col_s:
+                        if st.button("Save", key=f"comments_save_inline_{lead_id}", use_container_width=True):
+                            if edited_text.strip() and edited_text.strip() != text:
+                                with db_loader("Saving comment..."):
+                                    edit_note(lead_oid, note, edited_text.strip())
+                                st.session_state[edit_key] = False
+                                st.success("Comment updated.")
+                                st.rerun()
+                            elif edited_text.strip() == text:
+                                st.session_state[edit_key] = False
+                                st.rerun()
+                    with col_c:
+                        if st.button("Cancel", key=f"comments_cancel_inline_{lead_id}", use_container_width=True):
+                            st.session_state[edit_key] = False
+                            st.rerun()
+                else:
+                    col_e, _ = st.columns([1, 7])
+                    with col_e:
+                        if st.button("Edit comment", key=f"comments_edit_btn_{lead_id}", use_container_width=True):
+                            st.session_state[edit_key] = True
+                            st.rerun()
+
+        st.divider()
+        new_comment = st.text_area(
+            "Add new comment", value="", height=80,
+            placeholder="Type a new comment...",
+            key=f"comments_new_{lead_id}",
+        )
+        if st.button("Add comment", key=f"comments_add_{lead_id}", use_container_width=True):
+            if new_comment.strip():
+                with db_loader("Adding comment..."):
+                    add_note(lead_oid, new_comment.strip(), created_by=current_username())
+                st.success("Comment added.")
+                st.rerun()
+
+    else:
+        # ── Viewer: read-only ──
+        for idx, note in enumerate(notes_sorted):
+            st.markdown(comment_entry_html(note, idx == len(notes_sorted) - 1), unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def allocation_chain(lead: dict) -> list[str]:
     history = [h for h in (lead.get("allocationHistory") or []) if isinstance(h, dict)]
     ordered = sorted(
@@ -2896,140 +3143,7 @@ if page == "Leads":
             pass
 
         if selected_lead:
-            card_open("Comments", "lb-lime", "#a6ce39", subtitle="Read-only timeline from database")
-            notes = dedupe_notes([n for n in (selected_lead.get("notes") or []) if isinstance(n, dict)])
-            notes_sorted = sorted(
-                notes,
-                key=lambda n: (
-                    n.get("createdAt") if isinstance(n.get("createdAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc)
-                ),
-                reverse=True,
-            )
-
-            if can_delete_comments() and notes_sorted:
-                # Admin: all comments with edit + delete
-                for idx, note in enumerate(notes_sorted):
-                    author   = str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'
-                    ts       = format_note_datetime_ist((note or {}).get('createdAt'))
-                    text     = str((note or {}).get("text") or "").strip() or "(empty comment)"
-                    edit_history_line = format_edit_history(note)
-                    edit_key_a   = f"admin_editing_{selected_lead.get('leadId')}_{idx}"
-                    is_editing_a = st.session_state.get(edit_key_a, False)
-
-                    st.markdown(f"**{author} • {ts}**")
-                    if edit_history_line:
-                        st.caption(edit_history_line)
-
-                    if is_editing_a:
-                        edited_a = st.text_area(
-                            "Edit",
-                            value=text,
-                            height=100,
-                            key=f"admin_edit_text_{selected_lead.get('leadId')}_{idx}",
-                            label_visibility="collapsed",
-                        )
-                        col_as, col_ac = st.columns(2)
-                        with col_as:
-                            if st.button("Save", key=f"admin_save_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
-                                if edited_a.strip() and edited_a.strip() != text:
-                                    with db_loader("Saving comment..."):
-                                        edit_note(selected_lead["_id"], note, edited_a.strip())
-                                    st.session_state[edit_key_a] = False
-                                    st.success("Comment updated.")
-                                    st.rerun()
-                                elif edited_a.strip() == text:
-                                    st.session_state[edit_key_a] = False
-                                    st.rerun()
-                        with col_ac:
-                            if st.button("Cancel", key=f"admin_cancel_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
-                                st.session_state[edit_key_a] = False
-                                st.rerun()
-                    else:
-                        st.write(text)
-                        col_ae, col_ad = st.columns(2)
-                        with col_ae:
-                            if st.button("Edit", key=f"admin_edit_btn_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
-                                st.session_state[edit_key_a] = True
-                                st.rerun()
-                        with col_ad:
-                            if st.button("Delete", key=f"del_note_{selected_lead.get('leadId')}_{idx}", use_container_width=True):
-                                with db_loader("Deleting comment..."):
-                                    delete_note(selected_lead["_id"], note)
-                                st.success("Comment deleted.")
-                                st.rerun()
-                    if idx < len(notes_sorted) - 1:
-                        st.divider()
-
-            elif can_edit_leads():
-                # Manager: read-only for all except most recent which gets click-to-edit
-                if not notes_sorted:
-                    st.info("No comments available for this lead.")
-                else:
-                    for idx, note in enumerate(notes_sorted):
-                        meta = f"{str((note or {}).get('createdBy') or 'Unknown user').strip() or 'Unknown user'} • {format_note_datetime_ist((note or {}).get('createdAt'))}"
-                        edit_history_line = format_edit_history(note)
-                        st.markdown(f"**{meta}**")
-                        if edit_history_line:
-                            st.caption(edit_history_line)
-                        if idx == 0:
-                            note_text = str((note or {}).get("text") or "").strip()
-                            edit_key = f"editing_comment_{selected_lead.get('leadId')}"
-                            is_editing = st.session_state.get(edit_key, False)
-                            if is_editing:
-                                edited_text = st.text_area(
-                                    "Edit comment",
-                                    value=note_text,
-                                    height=100,
-                                    key=f"inline_edit_text_{selected_lead.get('leadId')}",
-                                    label_visibility="collapsed",
-                                )
-                                col_save, col_cancel = st.columns(2)
-                                with col_save:
-                                    if st.button("Save", key=f"save_inline_{selected_lead.get('leadId')}", use_container_width=True):
-                                        if edited_text.strip() and edited_text.strip() != note_text:
-                                            with db_loader("Saving comment..."):
-                                                edit_note(selected_lead["_id"], note, edited_text.strip())
-                                            st.session_state[edit_key] = False
-                                            st.success("Comment updated.")
-                                            st.rerun()
-                                        elif edited_text.strip() == note_text:
-                                            st.session_state[edit_key] = False
-                                            st.rerun()
-                                with col_cancel:
-                                    if st.button("Cancel", key=f"cancel_inline_{selected_lead.get('leadId')}", use_container_width=True):
-                                        st.session_state[edit_key] = False
-                                        st.rerun()
-                            else:
-                                st.write(note_text or "(empty comment)")
-                                if st.button("Edit comment", key=f"edit_btn_{selected_lead.get('leadId')}", use_container_width=True):
-                                    st.session_state[edit_key] = True
-                                    st.rerun()
-                        else:
-                            st.write(str((note or {}).get("text") or "").strip() or "(empty comment)")
-                        if idx < len(notes_sorted) - 1:
-                            st.divider()
-
-                # Add new comment — always shown for managers
-                st.divider()
-                new_comment = st.text_area(
-                    "Add new comment",
-                    value="",
-                    height=80,
-                    placeholder="Type a new comment...",
-                    key=f"new_comment_{selected_lead.get('leadId')}",
-                )
-                if st.button("Add comment", key=f"add_comment_{selected_lead.get('leadId')}", use_container_width=True):
-                    if new_comment.strip():
-                        with db_loader("Adding comment..."):
-                            add_note(selected_lead["_id"], new_comment.strip(), created_by=current_username())
-                        st.success("Comment added.")
-                        st.rerun()
-
-            else:
-                # Viewer: fully read-only
-                st.markdown(comments_view_html(notes_sorted), unsafe_allow_html=True)
-
-            card_close()
+            render_comments_section(selected_lead)
 
             card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
             history_rows = [h for h in (selected_lead.get("allocationHistory") or []) if isinstance(h, dict)]
