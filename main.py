@@ -1368,46 +1368,25 @@ def compute_chart_kpis(df: pd.DataFrame) -> dict:
 
 def render_kpi_strip(kpis: dict) -> str:
     cards = [
-        {
-            "accent": "#1B3A6B",
-            "label": "Total Leads",
-            "value": str(kpis["total"]),
-            "sub": "all time",
-        },
-        {
-            "accent": "#0E8A7A",
-            "label": "This Month",
-            "value": str(kpis["this_month"]),
-            "sub": kpis["this_month_label"],
-        },
-        {
-            "accent": "#534AB7",
-            "label": "Peak Month",
-            "value": str(kpis["peak_count"]),
-            "sub": kpis["peak_label"],
-        },
-        {
-            "accent": "#C8922A",
-            "label": "Avg / Month",
-            "value": str(kpis["avg_per_month"]),
-            "sub": "monthly average",
-        },
+        {"accent": "#1B3A6B", "label": "TOTAL",       "value": str(kpis["total"]),        "sub": "All time"},
+        {"accent": "#0E8A7A", "label": "THIS MONTH",  "value": str(kpis["this_month"]),   "sub": kpis["this_month_label"]},
+        {"accent": "#534AB7", "label": "PEAK MONTH",  "value": str(kpis["peak_count"]),   "sub": kpis["peak_label"]},
+        {"accent": "#C8922A", "label": "AVG/MONTH",   "value": str(kpis["avg_per_month"]), "sub": "rolling avg"},
     ]
     cols_html = ""
     for c in cards:
         cols_html += f"""
-        <div style="flex:1;background:white;border:1px solid #E2EAF2;border-radius:10px;
-                    border-left:4px solid {c['accent']};padding:10px 14px;">
+        <div style="flex:1;background:white;border:1px solid #E2EAF2;border-radius:8px;padding:10px 14px;">
           <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;
-                      text-transform:uppercase;color:{c['accent']};margin-bottom:4px;">
+                      text-transform:uppercase;color:#94A3B8;margin-bottom:4px;">
             {c['label']}
           </div>
-          <div style="font-size:20px;font-weight:700;color:#1E293B;line-height:1.1;">
+          <div style="font-size:22px;font-weight:700;color:{c['accent']};line-height:1.1;">
             {c['value']}
           </div>
           <div style="font-size:10px;color:#94A3B8;margin-top:3px;">{c['sub']}</div>
         </div>"""
-    return f'<div style="display:flex;gap:10px;margin-bottom:12px;">{cols_html}</div>'
+    return f'<div style="display:flex;gap:10px;margin-bottom:10px;">{cols_html}</div>'
 
 
 def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
@@ -1479,26 +1458,53 @@ def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
 
 
 def render_chart_section(df: pd.DataFrame) -> None:
-    # Section header
+    # Inject toggle CSS — pill segmented button look
     st.markdown("""
-    <div style="background:#1B3A6B;border-radius:10px 10px 0 0;padding:10px 16px;">
-      <div style="color:white;font-size:13px;font-weight:700;line-height:1.2;">Month-wise leads</div>
-      <div style="color:#A8C4E8;font-size:10px;margin-top:2px;">Lead activity over time</div>
-    </div>
+    <style>
+    div[data-testid="stRadio"][aria-label="chart_toggle"] > div {
+        flex-direction: row; gap: 0; border: 1px solid #CBD5E1;
+        border-radius: 8px; overflow: hidden; width: fit-content; padding: 0;
+    }
+    div[data-testid="stRadio"][aria-label="chart_toggle"] label {
+        padding: 4px 14px; margin: 0; border-radius: 0;
+        font-size: 12px; font-weight: 600; cursor: pointer; color: #64748B;
+    }
+    div[data-testid="stRadio"][aria-label="chart_toggle"] label:has(input:checked) {
+        background: #1B3A6B; color: white;
+    }
+    </style>
     """, unsafe_allow_html=True)
 
-    # Card body
     with st.container():
         st.markdown("""
-        <div style="background:white;border:0.5px solid #E2EAF2;border-radius:0 0 10px 10px;
+        <div style="background:white;border:1px solid #E2EAF2;border-radius:10px;
                     padding:14px 16px 10px 16px;">
         """, unsafe_allow_html=True)
+
+        # Header row: title left, toggle right
+        col_title, col_toggle = st.columns([3, 1])
+        with col_title:
+            st.markdown("""
+            <div style="margin-bottom:10px;">
+              <div style="font-size:14px;font-weight:700;color:#1E293B;line-height:1.2;">Month-wise leads</div>
+              <div style="font-size:11px;color:#94A3B8;margin-top:2px;">Lead activity over time</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with col_toggle:
+            chart_type = st.radio(
+                label="chart_toggle",
+                options=["Bar", "Line"],
+                index=1,
+                horizontal=True,
+                key="leads_chart_type",
+                label_visibility="collapsed",
+            )
 
         kpis = compute_chart_kpis(df)
         st.markdown(render_kpi_strip(kpis), unsafe_allow_html=True)
 
         st.plotly_chart(
-            render_leads_chart(df, "Line"),
+            render_leads_chart(df, chart_type),
             use_container_width=True,
             config={"displayModeBar": False},
         )
