@@ -1022,12 +1022,13 @@ def allocation_chain_text(lead: dict) -> str:
 # -----------------------
 
 def classify_allocation_event(row: dict, index: int) -> dict:
-    from_person = str(row.get("from") or "").strip()
-    to_person   = str(row.get("to")   or "").strip()
-    edited_by   = str(row.get("editedBy") or "Unknown").strip() or "Unknown"
+    from_person  = str(row.get("from") or "").strip()
+    to_person    = str(row.get("to")   or "").strip()
+    edited_by    = str(row.get("editedBy") or "Unknown").strip() or "Unknown"
     datetime_str = format_note_datetime_ist(row.get("editedAt"))
 
-    if index == 0 and not from_person:
+    # Initial: first record where `to` is empty — `from` holds the initial allocatee
+    if index == 0 and not to_person:
         return {
             "event_type": "initial",
             "label": "Lead created",
@@ -1035,12 +1036,13 @@ def classify_allocation_event(row: dict, index: int) -> dict:
             "dot_colour": "#1B3A6B",
             "badge_bg": "#E6F1FB",
             "badge_text_colour": "#0C447C",
-            "from_person": "—",
-            "to_person": to_person or "—",
+            "from_person": from_person or "NONE",
+            "to_person": "NONE",
             "edited_by": edited_by,
             "datetime_str": datetime_str,
         }
-    elif not from_person and to_person:
+    elif not from_person:
+        # No prior assignee → fresh assignment
         return {
             "event_type": "assigned",
             "label": "Assigned",
@@ -1048,8 +1050,8 @@ def classify_allocation_event(row: dict, index: int) -> dict:
             "dot_colour": "#0E8A7A",
             "badge_bg": "#E1F5EE",
             "badge_text_colour": "#085041",
-            "from_person": "—",
-            "to_person": to_person,
+            "from_person": "NONE",
+            "to_person": to_person or "NONE",
             "edited_by": edited_by,
             "datetime_str": datetime_str,
         }
@@ -1061,8 +1063,8 @@ def classify_allocation_event(row: dict, index: int) -> dict:
             "dot_colour": "#C8922A",
             "badge_bg": "#FDF3E3",
             "badge_text_colour": "#854F0B",
-            "from_person": from_person or "—",
-            "to_person": to_person or "—",
+            "from_person": from_person or "NONE",
+            "to_person": to_person or "NONE",
             "edited_by": edited_by,
             "datetime_str": datetime_str,
         }
@@ -1096,12 +1098,21 @@ def allocation_timeline_html(events: list[dict]) -> str:
             f'background:{badge_bg};color:{badge_tc};flex-shrink:0;">{ev["badge_text"]}</div>'
             f'</div>'
             f'<div style="font-size:11px;color:#64748B;margin-top:3px;">'
-            f'{from_p} '
-            f'<span style="color:#94A3B8;">→</span> '
-            f'<span style="font-weight:700;color:{dot_colour};">{to_p}</span>'
-            f' <span style="color:#94A3B8;">· by</span>'
-            f' <span style="color:#1E293B;">{by}</span>'
-            f'</div>'
+            + (
+                # Initial: "First allocation — {from} · by {by}"
+                f'First allocation <span style="color:#94A3B8;">—</span> '
+                f'<span style="font-weight:700;color:{dot_colour};">{from_p}</span>'
+                f' <span style="color:#94A3B8;">· by</span>'
+                f' <span style="color:#1E293B;">{by}</span>'
+                if ev["event_type"] == "initial" else
+                # Assigned / Reassigned: "{from} → {to} · by {by}"
+                f'{from_p} '
+                f'<span style="color:#94A3B8;">→</span> '
+                f'<span style="font-weight:700;color:{dot_colour};">{to_p}</span>'
+                f' <span style="color:#94A3B8;">· by</span>'
+                f' <span style="color:#1E293B;">{by}</span>'
+            )
+            + f'</div>'
             f'</div>'
             f'</div>'
         )
