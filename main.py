@@ -788,7 +788,7 @@ def _bubble_content_html(text: str) -> str:
         safe = entry_text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         if date_str:
             html += (
-                f'<div style="display:flex;gap:10px;align-items:baseline;margin-bottom:4px;">'
+                f'<div style="display:flex;align-items:baseline;margin-bottom:4px;">'
                 f'<span style="font-size:10px;font-weight:700;color:#94A3B8;min-width:56px;flex-shrink:0;">{date_str}</span>'
                 f'<span style="font-size:12px;color:#1E293B;">{safe}</span></div>'
             )
@@ -835,8 +835,8 @@ def render_comments_header(count: int) -> str:
         f'<div style="background:white;border:1px solid #E2EAF2;border-radius:10px 10px 0 0;'
         f'padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">'
         f'<div>'
-        f'<div style="color:#1E293B;font-size:13px;font-weight:700;line-height:1.2;">Comments</div>'
-        f'<div style="color:#94A3B8;font-size:10px;margin-top:2px;">Read-only timeline from database</div>'
+        f'<div style="color:#000;font-size:16px;font-weight:700;line-height:1.2;">COMMENTS</div>'
+        f'<div style="color:#000;font-size:10px;margin-top:2px;">Read-only timeline from database</div>'
         f'</div>'
         f'<div style="background:#E1F5EE;color:#085041;font-size:10px;font-weight:700;'
         f'padding:3px 10px;border-radius:10px;">{count} notes</div>'
@@ -1127,11 +1127,11 @@ def allocation_timeline_html(events: list[dict]) -> str:
 
 def render_allocation_header(count: int) -> str:
     return (
-        f'<div style="background:white;border:1px solid #E2EAF2;border-radius:10px 10px 0 0;'
+        f'<div style="background:#D9E4FA;border:1px solid #E2EAF2;'
         f'padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">'
         f'<div>'
-        f'<div style="color:#1E293B;font-size:13px;font-weight:700;line-height:1.2;">Allocation history</div>'
-        f'<div style="color:#94A3B8;font-size:10px;margin-top:2px;">Lead re-assignment audit trail</div>'
+        f'<div style="color:#000;font-size:16px;font-weight:700;line-height:1.2;">ALLOCATION HISTORY</div>'
+        f'<div style="color:#000;font-size:10px;margin-top:2px;">Lead re-assignment audit trail</div>'
         f'</div>'
         f'<div style="background:#E6F1FB;color:#0C447C;font-size:10px;font-weight:700;'
         f'padding:3px 10px;border-radius:8px;border:0.5px solid rgba(27,58,107,0.15);">{count} events</div>'
@@ -1863,7 +1863,7 @@ def render_chart_section(df: pd.DataFrame) -> None:
         <div style="background:#B3F0FC;padding:14px 16px 10px 16px;">
           <div style="margin-bottom:10px;">
             <div style="font-size:16px;font-weight:700;color:#000;line-height:1.2;">MONTH-WISE LEADS</div>
-            <div style="font-size:11px;color:#94A3B8;margin-top:2px;">Lead activity over time</div>
+            <div style="font-size:11px;color:#000;margin-top:2px;">Lead activity over time</div>
           </div>
         </div>
         """, unsafe_allow_html=True)
