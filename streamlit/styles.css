@@ -1,8 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
 :root{
   --navy:#2d448d;
   --lime:#a6ce39;
   --cyan:#00aeef;
-  --app-font:'Consolas', 'Courier New', monospace;
+  --app-font:'Outfit', sans-serif;
 
   --bg:#fff;
   --card:#fff;
@@ -24,9 +26,9 @@
   --shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
 }
 
-/* ── Global font: Consolas everywhere ── */
+/* ── Global font: Outfit everywhere ── */
 html, body {
-  font-family: 'Consolas', 'Courier New', monospace !important;
+  font-family: 'Outfit', sans-serif !important;
 }
 * {
   font-family: inherit !important;
