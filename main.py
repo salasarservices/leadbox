@@ -1401,7 +1401,7 @@ def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
             x=labels,
             y=counts,
             mode="lines+markers",
-            line=dict(color="#1B3A6B", width=2.5),
+            line=dict(color="#1B3A6B", width=2.5, shape="spline", smoothing=0.8),
             fill="tozeroy",
             fillcolor="rgba(27,58,107,0.07)",
             marker=dict(size=6, color="#1B3A6B"),
@@ -1458,58 +1458,25 @@ def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
 
 
 def render_chart_section(df: pd.DataFrame) -> None:
-    # Inject toggle CSS — pill segmented button look
-    st.markdown("""
-    <style>
-    div[data-testid="stRadio"][aria-label="chart_toggle"] > div {
-        flex-direction: row; gap: 0; border: 1px solid #CBD5E1;
-        border-radius: 8px; overflow: hidden; width: fit-content; padding: 0;
-    }
-    div[data-testid="stRadio"][aria-label="chart_toggle"] label {
-        padding: 4px 14px; margin: 0; border-radius: 0;
-        font-size: 12px; font-weight: 600; cursor: pointer; color: #64748B;
-    }
-    div[data-testid="stRadio"][aria-label="chart_toggle"] label:has(input:checked) {
-        background: #1B3A6B; color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
     with st.container():
         st.markdown("""
         <div style="background:white;border:1px solid #E2EAF2;border-radius:10px;
                     padding:14px 16px 10px 16px;">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:#1E293B;line-height:1.2;">Month-wise leads</div>
+            <div style="font-size:11px;color:#94A3B8;margin-top:2px;">Lead activity over time</div>
+          </div>
+        </div>
         """, unsafe_allow_html=True)
-
-        # Header row: title left, toggle right
-        col_title, col_toggle = st.columns([3, 1])
-        with col_title:
-            st.markdown("""
-            <div style="margin-bottom:10px;">
-              <div style="font-size:14px;font-weight:700;color:#1E293B;line-height:1.2;">Month-wise leads</div>
-              <div style="font-size:11px;color:#94A3B8;margin-top:2px;">Lead activity over time</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with col_toggle:
-            chart_type = st.radio(
-                label="chart_toggle",
-                options=["Bar", "Line"],
-                index=1,
-                horizontal=True,
-                key="leads_chart_type",
-                label_visibility="collapsed",
-            )
 
         kpis = compute_chart_kpis(df)
         st.markdown(render_kpi_strip(kpis), unsafe_allow_html=True)
 
         st.plotly_chart(
-            render_leads_chart(df, chart_type),
+            render_leads_chart(df, "Line"),
             use_container_width=True,
             config={"displayModeBar": False},
         )
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # -----------------------
