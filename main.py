@@ -1776,7 +1776,7 @@ def render_kpi_strip(kpis: dict) -> str:
     cols_html = ""
     for c in cards:
         cols_html += f"""
-        <div style="flex:1;background:#EDF9FA;padding:10px 14px;">
+        <div style="flex:1;background:none;padding:10px 14px;">
           <div style="font-size:9px;font-weight:700;letter-spacing:0.06em;
                       text-transform:uppercase;color:#94A3B8;margin-bottom:4px;">
             {c['label']}
