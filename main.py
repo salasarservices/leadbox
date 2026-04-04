@@ -832,7 +832,7 @@ def comment_entry_html(note: dict, is_last: bool) -> str:
 
 def render_comments_header(count: int) -> str:
     return (
-        f'<div style="background:white;border:1px solid #E2EAF2;border-radius:10px 10px 0 0;'
+        f'<div style="background:#E6F296;border:1px solid #E2EAF2;'
         f'padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">'
         f'<div>'
         f'<div style="color:#000;font-size:16px;font-weight:700;line-height:1.2;">COMMENTS</div>'
