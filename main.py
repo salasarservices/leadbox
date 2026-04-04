@@ -832,13 +832,13 @@ def comment_entry_html(note: dict, is_last: bool) -> str:
 
 def render_comments_header(count: int) -> str:
     return (
-        f'<div style="background:#0E8A7A;border-radius:10px 10px 0 0;padding:10px 16px;'
-        f'display:flex;align-items:center;justify-content:space-between;">'
+        f'<div style="background:white;border:1px solid #E2EAF2;border-radius:10px 10px 0 0;'
+        f'padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">'
         f'<div>'
-        f'<div style="color:white;font-size:13px;font-weight:700;line-height:1.2;">Comments</div>'
-        f'<div style="color:rgba(255,255,255,0.75);font-size:10px;margin-top:2px;">Read-only timeline from database</div>'
+        f'<div style="color:#1E293B;font-size:13px;font-weight:700;line-height:1.2;">Comments</div>'
+        f'<div style="color:#94A3B8;font-size:10px;margin-top:2px;">Read-only timeline from database</div>'
         f'</div>'
-        f'<div style="background:rgba(255,255,255,0.15);color:white;font-size:10px;font-weight:700;'
+        f'<div style="background:#E1F5EE;color:#085041;font-size:10px;font-weight:700;'
         f'padding:3px 10px;border-radius:10px;">{count} notes</div>'
         f'</div>'
     )
@@ -859,8 +859,8 @@ def render_comments_section(selected_lead: dict) -> None:
 
     st.markdown(render_comments_header(len(notes_sorted)), unsafe_allow_html=True)
     st.markdown(
-        '<div style="background:white;border:0.5px solid #E2EAF2;'
-        'border-radius:0 0 12px 12px;padding:16px 16px 8px 16px;">',
+        '<div style="background:white;border:1px solid #E2EAF2;border-top:none;'
+        'border-radius:0 0 10px 10px;padding:16px 16px 8px 16px;">',
         unsafe_allow_html=True,
     )
 
@@ -918,13 +918,13 @@ def render_comments_section(selected_lead: dict) -> None:
                         st.rerun()
 
             else:
-                col_e, col_d, _ = st.columns([1, 1, 6])
+                col_e, col_d, _ = st.columns([2, 2, 8])
                 with col_e:
-                    if st.button("Edit", key=f"comments_admin_edit_btn_{lead_id}_{idx}", use_container_width=True):
+                    if st.button("Edit", key=f"comments_admin_edit_btn_{lead_id}_{idx}"):
                         st.session_state[edit_key] = True
                         st.rerun()
                 with col_d:
-                    if st.button("Delete", key=f"comments_admin_del_btn_{lead_id}_{idx}", use_container_width=True):
+                    if st.button("Delete", key=f"comments_admin_del_btn_{lead_id}_{idx}"):
                         st.session_state[del_key] = True
                         st.rerun()
 
@@ -961,9 +961,9 @@ def render_comments_section(selected_lead: dict) -> None:
                             st.session_state[edit_key] = False
                             st.rerun()
                 else:
-                    col_e, _ = st.columns([1, 7])
+                    col_e, _ = st.columns([2, 8])
                     with col_e:
-                        if st.button("Edit comment", key=f"comments_edit_btn_{lead_id}", use_container_width=True):
+                        if st.button("Edit comment", key=f"comments_edit_btn_{lead_id}"):
                             st.session_state[edit_key] = True
                             st.rerun()
 
