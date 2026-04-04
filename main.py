@@ -1860,10 +1860,9 @@ def render_leads_chart(df: pd.DataFrame, chart_type: str) -> go.Figure:
 def render_chart_section(df: pd.DataFrame) -> None:
     with st.container():
         st.markdown("""
-        <div style="background:white;border:1px solid #E2EAF2;border-radius:10px;
-                    padding:14px 16px 10px 16px;">
+        <div style="background:#B3F0FC;padding:14px 16px 10px 16px;">
           <div style="margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:700;color:#1E293B;line-height:1.2;">Month-wise leads</div>
+            <div style="font-size:16px;font-weight:700;color:#000;line-height:1.2;">MONTH-WISE LEADS</div>
             <div style="font-size:11px;color:#94A3B8;margin-top:2px;">Lead activity over time</div>
           </div>
         </div>
