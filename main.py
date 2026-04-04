@@ -1017,6 +1017,148 @@ def allocation_chain_text(lead: dict) -> str:
     return " -> ".join(chain) if chain else "—"
 
 
+# -----------------------
+# Allocation history timeline
+# -----------------------
+
+def classify_allocation_event(row: dict, index: int) -> dict:
+    from_person = str(row.get("from") or "").strip()
+    to_person   = str(row.get("to")   or "").strip()
+    edited_by   = str(row.get("editedBy") or "Unknown").strip() or "Unknown"
+    datetime_str = format_note_datetime_ist(row.get("editedAt"))
+
+    if index == 0 and not from_person:
+        return {
+            "event_type": "initial",
+            "label": "Lead created",
+            "badge_text": "Initial",
+            "dot_colour": "#1B3A6B",
+            "badge_bg": "#E6F1FB",
+            "badge_text_colour": "#0C447C",
+            "from_person": "—",
+            "to_person": to_person or "—",
+            "edited_by": edited_by,
+            "datetime_str": datetime_str,
+        }
+    elif not from_person and to_person:
+        return {
+            "event_type": "assigned",
+            "label": "Assigned",
+            "badge_text": "Assigned",
+            "dot_colour": "#0E8A7A",
+            "badge_bg": "#E1F5EE",
+            "badge_text_colour": "#085041",
+            "from_person": "—",
+            "to_person": to_person,
+            "edited_by": edited_by,
+            "datetime_str": datetime_str,
+        }
+    else:
+        return {
+            "event_type": "reassigned",
+            "label": "Re-assigned",
+            "badge_text": "Reassigned",
+            "dot_colour": "#C8922A",
+            "badge_bg": "#FDF3E3",
+            "badge_text_colour": "#854F0B",
+            "from_person": from_person or "—",
+            "to_person": to_person or "—",
+            "edited_by": edited_by,
+            "datetime_str": datetime_str,
+        }
+
+
+def allocation_timeline_html(events: list[dict]) -> str:
+    rows_html = ""
+    for i, ev in enumerate(events):
+        is_last = i == len(events) - 1
+        row_class = "timeline-last" if is_last else ""
+        dot_colour = ev["dot_colour"]
+        badge_bg   = ev["badge_bg"]
+        badge_tc   = ev["badge_text_colour"]
+
+        from_p = ev["from_person"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        to_p   = ev["to_person"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        by     = ev["edited_by"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        rows_html += (
+            f'<div style="display:flex;gap:12px;margin-bottom:{"0" if is_last else "18px"};'
+            f'position:relative;" class="{row_class}">'
+            # dot
+            f'<div style="position:absolute;left:-25px;top:4px;width:12px;height:12px;'
+            f'border-radius:50%;background:{dot_colour};border:2.5px solid white;flex-shrink:0;"></div>'
+            # content
+            f'<div style="flex:1;">'
+            f'<div style="font-size:10px;color:#94A3B8;margin-bottom:3px;">{ev["datetime_str"]}</div>'
+            f'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+            f'<div style="font-size:12px;font-weight:700;color:#1E293B;">{ev["label"]}</div>'
+            f'<div style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px;'
+            f'background:{badge_bg};color:{badge_tc};flex-shrink:0;">{ev["badge_text"]}</div>'
+            f'</div>'
+            f'<div style="font-size:11px;color:#64748B;margin-top:3px;">'
+            f'{from_p} '
+            f'<span style="color:#94A3B8;">→</span> '
+            f'<span style="font-weight:700;color:{dot_colour};">{to_p}</span>'
+            f' <span style="color:#94A3B8;">· by</span>'
+            f' <span style="color:#1E293B;">{by}</span>'
+            f'</div>'
+            f'</div>'
+            f'</div>'
+        )
+
+    return (
+        f'<div style="position:relative;padding-left:36px;">'
+        f'<div style="position:absolute;left:11px;top:12px;bottom:12px;width:2px;background:#E2EAF2;"></div>'
+        f'{rows_html}'
+        f'</div>'
+    )
+
+
+def render_allocation_header(count: int) -> str:
+    return (
+        f'<div style="background:white;border:1px solid #E2EAF2;border-radius:10px 10px 0 0;'
+        f'padding:10px 16px;display:flex;align-items:center;justify-content:space-between;">'
+        f'<div>'
+        f'<div style="color:#1E293B;font-size:13px;font-weight:700;line-height:1.2;">Allocation history</div>'
+        f'<div style="color:#94A3B8;font-size:10px;margin-top:2px;">Lead re-assignment audit trail</div>'
+        f'</div>'
+        f'<div style="background:#E6F1FB;color:#0C447C;font-size:10px;font-weight:700;'
+        f'padding:3px 10px;border-radius:8px;border:0.5px solid rgba(27,58,107,0.15);">{count} events</div>'
+        f'</div>'
+    )
+
+
+def render_allocation_empty() -> str:
+    return (
+        '<div style="text-align:center;padding:24px;">'
+        '<span style="font-size:12px;color:#94A3B8;">No allocation history recorded for this lead.</span>'
+        '</div>'
+    )
+
+
+def render_allocation_section(selected_lead: dict) -> None:
+    history_rows = [h for h in (selected_lead.get("allocationHistory") or []) if isinstance(h, dict)]
+    history_rows = sorted(
+        history_rows,
+        key=lambda h: h.get("editedAt") if isinstance(h.get("editedAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc),
+    )
+
+    st.markdown(render_allocation_header(len(history_rows)), unsafe_allow_html=True)
+    st.markdown(
+        '<div style="background:white;border:1px solid #E2EAF2;border-top:none;'
+        'border-radius:0 0 10px 10px;padding:16px 20px;">',
+        unsafe_allow_html=True,
+    )
+
+    if not history_rows:
+        st.markdown(render_allocation_empty(), unsafe_allow_html=True)
+    else:
+        events = [classify_allocation_event(row, i) for i, row in enumerate(history_rows)]
+        st.markdown(allocation_timeline_html(events), unsafe_allow_html=True)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def kpi_circles_html(total: int, interested: int, not_interested: int, closed: int, total_brokerage: float):
     brok = format_inr_compact(total_brokerage)
     conversion = f"{(closed / total * 100):.1f}%" if total > 0 else "0%"
@@ -3145,27 +3287,7 @@ if page == "Leads":
         if selected_lead:
             render_comments_section(selected_lead)
 
-            card_open("Allocation History", "lb-cyan", "#00aeef", subtitle="Lead re-assignment audit trail")
-            history_rows = [h for h in (selected_lead.get("allocationHistory") or []) if isinstance(h, dict)]
-            history_rows = sorted(
-                history_rows,
-                key=lambda h: h.get("editedAt") if isinstance(h.get("editedAt"), datetime) else datetime.min.replace(tzinfo=timezone.utc),
-            )
-            if history_rows:
-                view_rows: list[dict] = []
-                for h in history_rows:
-                    view_rows.append(
-                        {
-                            "First Allocation": (h.get("from") or "—") if h.get("from") else "—",
-                            "Re-Allocated To": (h.get("to") or "—") if h.get("to") else "—",
-                            "Edited By": (h.get("editedBy") or "Unknown user") if h.get("editedBy") else "Unknown user",
-                            "Date & Time": format_note_datetime_ist(h.get("editedAt")),
-                        }
-                    )
-                st.dataframe(pd.DataFrame(view_rows), use_container_width=True, hide_index=True)
-            else:
-                st.info("No allocation history available for this lead.")
-            card_close()
+            render_allocation_section(selected_lead)
 
 elif page == "Create Lead":
     require_role(ROLE_MANAGER)
