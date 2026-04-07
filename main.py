@@ -929,7 +929,7 @@ def render_comments_section(selected_lead: dict) -> None:
                         st.rerun()
 
     elif can_edit_leads():
-        # ── Manager: most recent editable, rest read-only; add new at bottom ──
+        # ── Manager: most recent editable, rest read-only ──
         for idx, note in enumerate(notes_sorted):
             is_last = idx == len(notes_sorted) - 1
             text = str((note or {}).get("text") or "").strip() or "(empty comment)"
@@ -967,6 +967,13 @@ def render_comments_section(selected_lead: dict) -> None:
                             st.session_state[edit_key] = True
                             st.rerun()
 
+    else:
+        # ── Viewer: read-only ──
+        for idx, note in enumerate(notes_sorted):
+            st.markdown(comment_entry_html(note, idx == len(notes_sorted) - 1), unsafe_allow_html=True)
+
+    # ── Add new comment — shown for managers regardless of existing notes ──
+    if can_edit_leads() and not can_delete_comments():
         st.divider()
         new_comment = st.text_area(
             "Add new comment", value="", height=80,
@@ -979,11 +986,6 @@ def render_comments_section(selected_lead: dict) -> None:
                     add_note(lead_oid, new_comment.strip(), created_by=current_username())
                 st.success("Comment added.")
                 st.rerun()
-
-    else:
-        # ── Viewer: read-only ──
-        for idx, note in enumerate(notes_sorted):
-            st.markdown(comment_entry_html(note, idx == len(notes_sorted) - 1), unsafe_allow_html=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
