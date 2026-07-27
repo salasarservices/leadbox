@@ -1678,6 +1678,25 @@ def first_month_in_db() -> datetime:
     return datetime(now.year, now.month, 1, 0, 0, 0, tzinfo=IST)
 
 
+def month_chip_list() -> list[tuple[int, int]]:
+    """Ordered (year, month) tuples from the earliest lead month in the DB
+    through the current IST month, inclusive. Used to render month filter chips."""
+    start = first_month_in_db()
+    now_ist = datetime.now(IST)
+    chips: list[tuple[int, int]] = []
+    y, m = start.year, start.month
+    # Guard against a malformed/future earliest date producing an empty list.
+    if (y, m) > (now_ist.year, now_ist.month):
+        y, m = now_ist.year, now_ist.month
+    while (y, m) <= (now_ist.year, now_ist.month):
+        chips.append((y, m))
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+    return chips
+
+
 def month_series_counts_df() -> pd.DataFrame:
     col = leads_col()
 
@@ -2303,6 +2322,49 @@ def render_leads_table(leads: list[dict], *, table_key: str, download_key: str, 
         st.session_state.pop("selected_lead_id", None)
 
 
+def render_month_chips(active: Optional[tuple[int, int]], disabled: bool) -> None:
+    """Render a row of month quick-filter chips (oldest lead month → current IST month).
+
+    Clicking a chip stores its (year, month) in session_state["leads_month_chip"] and
+    reruns; the "All" chip clears it. When ``disabled`` is True (an explicit sidebar
+    Month Filter is active) the chips are shown inert to avoid conflicting filters.
+    """
+    chips = month_chip_list()
+    if not chips:
+        return
+
+    # ("All" resets) + one chip per month, e.g. "Jan 26".
+    options: list[tuple[str, Optional[tuple[int, int]]]] = [("All", None)]
+    options += [(f"{MONTHS[m - 1].title()} {str(y)[-2:]}", (y, m)) for (y, m) in chips]
+
+    per_row = 8
+    for i in range(0, len(options), per_row):
+        row = options[i:i + per_row]
+        cols = st.columns(len(row))
+        for col, (label, val) in zip(cols, row):
+            with col:
+                if val is None:
+                    is_active = (active is None) and not disabled
+                else:
+                    is_active = (val == active)
+                clicked = st.button(
+                    label,
+                    key=f"month_chip_{label}",
+                    type=("primary" if is_active else "secondary"),
+                    use_container_width=True,
+                    disabled=disabled,
+                )
+                if clicked:
+                    if val is None:
+                        st.session_state.pop("leads_month_chip", None)
+                    else:
+                        st.session_state["leads_month_chip"] = val
+                    st.rerun()
+
+    if disabled:
+        st.caption("Month chips are paused while a sidebar Month Filter is active.")
+
+
 def compute_kpis_from_docs(docs: list[dict]) -> dict:
     total = len(docs)
     interested = sum(1 for d in docs if (d.get("leadStatus") or "").lower() == "interested")
@@ -2892,6 +2954,20 @@ filters = {
 # Pages
 # -----------------------
 if page == "Leads":
+    # ── Month quick-filter chips ──────────────────────────────────────────────
+    # A selected chip narrows the table to that month, but only when no explicit
+    # sidebar Month Filter is active (sidebar month / date range takes priority).
+    _sidebar_month_active = filters.get("month_mode") in {"month", "date range"}
+    _chip_sel = None if _sidebar_month_active else st.session_state.get("leads_month_chip")
+    if _chip_sel:
+        _chip_year, _chip_month = _chip_sel
+        filters = {
+            **filters,
+            "month_mode": "month",
+            "month_year": int(_chip_year),
+            "month_num": int(_chip_month),
+        }
+
     with db_loader("Fetching leads..."):
         leads = fetch_leads(filters)
     is_filtered = filters_are_active(filters)
@@ -2938,12 +3014,16 @@ if page == "Leads":
         start_label = filters["range_start"].strftime("%d %b %Y")
         end_label = filters["range_end"].strftime("%d %b %Y")
         table_subtitle = f"Leads in selected range ({start_label} - {end_label}): {len(leads)}"
+    elif _chip_sel:
+        _chip_label = f"{MONTHS[_chip_sel[1] - 1].title()} {str(_chip_sel[0])[-2:]}"
+        table_subtitle = f"Showing {_chip_label} leads: {len(leads)}"
     else:
         table_subtitle = f"Matching leads: {len(leads)}" if is_filtered else f"Showing all leads: {len(leads)}"
     download_label = "Download Filtered Leads CSV" if is_filtered else "Download Leads CSV"
     download_key = "filtered_leads" if is_filtered else "leads"
 
     card_open(table_title, "lb-leads-neutral", "#11c1b2", subtitle=table_subtitle)
+    render_month_chips(active=_chip_sel, disabled=_sidebar_month_active)
     render_leads_table(
         leads,
         table_key="filtered_leads_table",
