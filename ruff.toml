@@ -1,0 +1,21 @@
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes (unused imports, undefined names, etc.)
+    "I",   # isort (import order)
+    "UP",  # pyupgrade (modern Python syntax)
+    "B",   # flake8-bugbear (likely bugs)
+    "S",   # flake8-bandit (security)
+]
+ignore = [
+    "S101",  # allow assert statements
+    "S105",  # allow hardcoded passwords (secrets are in streamlit secrets, not code)
+    "S106",
+    "E501",  # line too long — not enforced for now
+]
+
+[lint.per-file-ignores]
+"main.py" = [
+    "S311",  # allow standard pseudo-random generators (used for non-security purposes)
+]
