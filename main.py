@@ -2030,6 +2030,7 @@ def build_leads_table_frames(leads: list[dict]) -> tuple[pd.DataFrame, pd.DataFr
             "Lead ID": d.get("leadId") or "",
             "Name": d.get("contactName") or "",
             "Company": d.get("companyName") or "",
+            "Insurance Type": d.get("productType") or "",
             "Allocated To": allocation_chain_text(d).replace("—", ""),
             "Status": denormalize_lead_status(d.get("leadStatus")) or "",
             "Brokerage Received": parse_money(d.get("brokerageReceived")) or 0,
@@ -2191,7 +2192,7 @@ def generate_leads_pdf(df: pd.DataFrame, report_title: str, filters: Optional[di
 
     # ── Table ────────────────────────────────────────────────────────────────
     _display_cols = [
-        "Number", "Lead ID", "Name", "Company",
+        "Number", "Lead ID", "Name", "Company", "Insurance Type",
         "Allocated To", "Status", "Brokerage Received",
         "Phone Number", "Email",
     ]
@@ -2215,15 +2216,16 @@ def generate_leads_pdf(df: pd.DataFrame, report_title: str, filters: Optional[di
 
     # Column widths — landscape A4 usable width ≈ 26.7 cm
     col_w_map = {
-        "Number":            1.1 * cm,
-        "Lead ID":           2.3 * cm,
-        "Name":              3.8 * cm,
-        "Company":           4.5 * cm,
-        "Allocated To":      3.8 * cm,
-        "Status":            2.2 * cm,
-        "Brokerage Received":2.6 * cm,
-        "Phone Number":      2.8 * cm,
-        "Email":             4.0 * cm,
+        "Number":            1.0 * cm,
+        "Lead ID":           2.1 * cm,
+        "Name":              3.3 * cm,
+        "Company":           3.6 * cm,
+        "Insurance Type":    3.0 * cm,
+        "Allocated To":      3.3 * cm,
+        "Status":            2.0 * cm,
+        "Brokerage Received":2.4 * cm,
+        "Phone Number":      2.6 * cm,
+        "Email":             3.4 * cm,
     }
     col_widths = [col_w_map.get(c, 3 * cm) for c in df_view.columns]
 
